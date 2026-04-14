@@ -10,17 +10,15 @@ from pos.models.stage3 import TicketArtifact
 from pos.spec import encode_ticket_preimage, hash_bytes, split_digest_hex
 
 
-class MockTicketBuilder:
+class TicketBuilder:
     """
     对应专利步骤7、8。
 
-    在第0层规范中，票根相关约定被固定为：
-    - 票根原像使用版本化的二进制编码；
-    - 哈希函数统一取自 pp.hash_name；
-    - 哈希值从中间位置等长拆分为 prefix / suffix；
-    - 序列化字节序使用 pp.serialization_byte_order。
-
-    FHE 加密和证明仍保持原有占位接口，后续替换不会再改票根数据格式。
+    票根规范：
+    1. 票根原像使用统一版本化二进制编码；
+    2. participant_id 和 nonce 都使用长度前缀；
+    3. 哈希函数固定取自 pp.hash_name；
+    4. 哈希十六进制字符串从中间等长拆分成 prefix/suffix。
     """
 
     def __init__(self, fhe: MockThresholdFHE, proof_generator: MockProofShareGenerator) -> None:
@@ -35,6 +33,7 @@ class MockTicketBuilder:
         proof_share_count: int,
     ) -> TicketArtifact:
         nonce = secrets.token_bytes(pp.ticket_nonce_bytes)
+
         ticket_preimage_bytes = encode_ticket_preimage(
             participant_id=participant.participant_id,
             nonce=nonce,
@@ -43,6 +42,7 @@ class MockTicketBuilder:
             byte_order=pp.serialization_byte_order,
         )
         ticket_preimage = ticket_preimage_bytes.hex()
+
         ticket_hash = hash_bytes(ticket_preimage_bytes, pp.hash_name)
         ticket_hash_prefix, ticket_hash_suffix = split_digest_hex(ticket_hash)
 
@@ -71,3 +71,6 @@ class MockTicketBuilder:
             encrypted_ticket_suffix=encrypted_ticket_suffix,
             ticket_proof_shares=ticket_proof_shares,
         )
+
+
+MockTicketBuilder = TicketBuilder

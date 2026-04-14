@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,3 +19,10 @@ class PublicParameters:
     N: int
     sigma: float
     mu: float
+    hash_name: str
+    ticket_nonce_bytes: int
+    proof_share_count: int
+    proof_recover_threshold: int
+    serialization_byte_order: str
+    serialization_length_bytes: int
+    ticket_version: int

@@ -118,7 +118,7 @@ def resolve_security_profile(security_parameter: int) -> SecurityProfile:
         return SECURITY_PROFILES[192]
     raise ValueError(
         f"Unsupported security parameter: {security_parameter}. "
-        "Supported maximum is 192 in the current phase-0 configuration."
+        "Supported maximum is 192 in the current configuration."
     )
 
 
@@ -186,3 +186,36 @@ def derive_generator_of_order_q(p: int, q: int, domain_label: str) -> int:
         if generator != 1 and pow(generator, q, p) == 1:
             return generator
         seed += 1
+
+
+def hash_to_field(data: bytes, modulus: int, hash_name: str) -> int:
+    digest = get_hash_function(hash_name)(data).digest()
+    return int.from_bytes(digest, "big") % modulus
+
+
+def bit_decompose_bytes(data: bytes) -> list[int]:
+    bits: list[int] = []
+    for byte in data:
+        for shift in range(7, -1, -1):
+            bits.append((byte >> shift) & 1)
+    return bits
+
+
+def derive_field_vector(
+    *,
+    domain_label: str,
+    index: int,
+    dimension: int,
+    modulus: int,
+    hash_name: str,
+) -> list[int]:
+    if dimension <= 0:
+        raise ValueError("dimension must be positive")
+    vector: list[int] = []
+    for coordinate in range(dimension):
+        payload = (
+            f"{domain_label}|index={index}|coord={coordinate}".encode("utf-8")
+        )
+        value = hash_to_field(payload, modulus, hash_name)
+        vector.append(value)
+    return vector

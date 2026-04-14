@@ -23,9 +23,11 @@ def step4_generate_prf_shares(
     pp: PublicParameters,
     participants: List[Participant],
     random_seed: str,
+    key_shares: Dict[str, int],
 ) -> Dict[str, PRFShare]:
     """
     对应专利步骤4：生成伪随机数分片。
+    使用阶段2中真实 DKG 产生的标量密钥份额，生成 LWE 风格 key-homomorphic PRF 分片。
     """
     prf = MockKeyHomomorphicPRF()
     return {
@@ -33,6 +35,7 @@ def step4_generate_prf_shares(
             pp=pp,
             participant=participant,
             random_seed=random_seed,
+            key_share_scalar=key_shares[participant.participant_id],
         )
         for participant in participants
     }
@@ -57,7 +60,12 @@ def step5_encrypt_prf_shares_and_generate_proof_shares(
         ).payload
         proof_shares = proof_generator.build_proof_shares(
             secret_label="prf",
-            secret_value=prf_share.prf_share,
+            secret_value=(
+                f"participant={participant_id}"
+                f"|key_share_scalar={prf_share.key_share_scalar}"
+                f"|public_vector_digest={prf_share.public_vector_digest}"
+                f"|prf_output={prf_share.prf_share_value}"
+            ),
             proof_share_count=proof_share_count,
         )
         share_public_key_set = proof_generator.build_share_public_keys(
@@ -156,9 +164,6 @@ def step8_generate_ticket_proof_shares_and_publish_candidate_messages(
 ) -> Dict[str, CandidateMessage]:
     """
     对应专利步骤8：生成加密票根证明分片并发布参选消息。
-    说明：
-    - 票根证明分片在当前工程里已在步骤7/8的 ticket_artifact 中构造好；
-    - 这里负责按专利定义的消息结构汇总并“发布”成 CandidateMessage。
     """
     candidate_messages: Dict[str, CandidateMessage] = {}
 
@@ -192,21 +197,22 @@ def run_phase3_candidacy(
     proof_share_count: int,
 ) -> Phase3Result:
     """
-    阶段3入口：
-    - 步骤4：生成伪随机数分片
-    - 步骤5：加密伪随机数分片并生成 ZK 证明分片
-    - 步骤6：加密质押值并生成 ZK 证明分片
-    - 步骤7：生成票根、票根哈希并加密后半段
-    - 步骤8：生成加密票根证明分片并发布参选消息
+    阶段3入口。
+    外部接口保持不变。
     """
     public_key = phase2_result.distributed_key_result.public_key
     commitments = phase2_result.commitments
     random_seed = phase2_result.random_seed
+    key_shares = {
+        participant_id: decrypt_key_share.decrypt_share_key
+        for participant_id, decrypt_key_share in phase2_result.distributed_key_result.decrypt_key_shares.items()
+    }
 
     prf_shares = step4_generate_prf_shares(
         pp=pp,
         participants=participants,
         random_seed=random_seed,
+        key_shares=key_shares,
     )
     encrypted_prf_share_artifacts = step5_encrypt_prf_shares_and_generate_proof_shares(
         public_key=public_key,

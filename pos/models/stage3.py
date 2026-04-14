@@ -9,6 +9,11 @@ from pos.models.stage2 import Participant, StakeCommitment
 @dataclass(frozen=True)
 class PRFShare:
     participant_id: str
+    key_share_scalar: int
+    secret_vector: tuple[int, ...]
+    input_bits_length: int
+    public_vector_digest: str
+    prf_share_value: int
     prf_share: str
 
 
