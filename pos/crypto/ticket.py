@@ -1,20 +1,26 @@
 from __future__ import annotations
 
-import hashlib
 import secrets
 
 from pos.crypto.fhe import MockThresholdFHE
+from pos.crypto.proofs import MockProofShareGenerator
 from pos.models.common import PublicParameters
 from pos.models.stage2 import Participant
 from pos.models.stage3 import TicketArtifact
-from pos.crypto.proofs import MockProofShareGenerator
+from pos.spec import encode_ticket_preimage, hash_bytes, split_digest_hex
 
 
 class MockTicketBuilder:
     """
     对应专利步骤7、8。
-    生成票根、票根哈希、前后半段，并加密后半段票根哈希。
-    未在专利中确认：票根编码与哈希拆分的唯一工程格式。
+
+    在第0层规范中，票根相关约定被固定为：
+    - 票根原像使用版本化的二进制编码；
+    - 哈希函数统一取自 pp.hash_name；
+    - 哈希值从中间位置等长拆分为 prefix / suffix；
+    - 序列化字节序使用 pp.serialization_byte_order。
+
+    FHE 加密和证明仍保持原有占位接口，后续替换不会再改票根数据格式。
     """
 
     def __init__(self, fhe: MockThresholdFHE, proof_generator: MockProofShareGenerator) -> None:
@@ -28,15 +34,17 @@ class MockTicketBuilder:
         participant: Participant,
         proof_share_count: int,
     ) -> TicketArtifact:
-        ticket_preimage = (
-            f"ticket_preimage("
-            f"{participant.participant_id}:"
-            f"{secrets.token_hex(16)})"
+        nonce = secrets.token_bytes(pp.ticket_nonce_bytes)
+        ticket_preimage_bytes = encode_ticket_preimage(
+            participant_id=participant.participant_id,
+            nonce=nonce,
+            version=pp.ticket_version,
+            length_bytes=pp.serialization_length_bytes,
+            byte_order=pp.serialization_byte_order,
         )
-        ticket_hash = hashlib.sha256(ticket_preimage.encode("utf-8")).hexdigest()
-        midpoint = len(ticket_hash) // 2
-        ticket_hash_prefix = ticket_hash[:midpoint]
-        ticket_hash_suffix = ticket_hash[midpoint:]
+        ticket_preimage = ticket_preimage_bytes.hex()
+        ticket_hash = hash_bytes(ticket_preimage_bytes, pp.hash_name)
+        ticket_hash_prefix, ticket_hash_suffix = split_digest_hex(ticket_hash)
 
         encrypted_ticket_suffix = self._fhe.encrypt(
             pk=public_key,

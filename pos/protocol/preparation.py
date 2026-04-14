@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from pos.crypto.commitment import MockPedersenCommitment
+from pos.crypto.commitment import PedersenCommitment
 from pos.crypto.dkg import MockDistributedKeyGenerator
 from pos.crypto.fhe import MockThresholdFHE
-from pos.crypto.random_seed import MockRandomSeedGenerator
+from pos.crypto.random_seed import RandomSeedGenerator
 from pos.models.common import PublicParameters
 from pos.models.stage2 import (
     DistributedKeyGenerationResult,
@@ -24,7 +24,7 @@ def step1_generate_and_publish_stake_commitments(
     """
     对应专利步骤1：每个参与者生成并发布质押承诺 CM_i。
     """
-    commitment_scheme = MockPedersenCommitment()
+    commitment_scheme = PedersenCommitment()
     commitments: Dict[str, StakeCommitment] = {}
 
     for participant in participants:
@@ -65,12 +65,12 @@ def step3_distributed_generate_random_seed(
     """
     对应专利步骤3：分布式生成随机种子。
     """
-    seed_generator = MockRandomSeedGenerator()
+    seed_generator = RandomSeedGenerator()
     contributions: List[RandomSeedContribution] = [
         seed_generator.generate_contribution(pp=pp, participant=participant)
         for participant in participants
     ]
-    random_seed: str = seed_generator.combine_contributions(contributions)
+    random_seed = seed_generator.combine_contributions(pp=pp, contributions=contributions)
     contribution_mapping: Dict[str, RandomSeedContribution] = (
         seed_generator.contributions_to_mapping(contributions)
     )

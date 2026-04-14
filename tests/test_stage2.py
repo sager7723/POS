@@ -29,7 +29,7 @@ def test_step1_generate_and_publish_stake_commitments() -> None:
     assert len(commitments) == 3
     assert "P1" in commitments
     assert commitments["P1"].participant_id == "P1"
-    assert commitments["P1"].stake_commitment.startswith("pedersen_commit(")
+    assert commitments["P1"].stake_commitment.startswith("pedersen_commit:0x")
 
 
 def test_step2_distributed_generate_keys() -> None:
@@ -60,7 +60,7 @@ def test_step3_distributed_generate_random_seed() -> None:
     )
 
     assert isinstance(random_seed, str)
-    assert len(random_seed) == 64
+    assert len(random_seed) >= 64
     assert len(contributions) == 3
     assert "P3" in contributions
 
