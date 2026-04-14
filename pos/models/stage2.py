@@ -37,9 +37,16 @@ class DistributedKeyGenerationResult:
 
 
 @dataclass(frozen=True)
+class RandomSeedCommitment:
+    participant_id: str
+    seed_commitment: str
+
+
+@dataclass(frozen=True)
 class RandomSeedContribution:
     participant_id: str
     local_random_value: int
+    reveal_randomness: int
 
 
 @dataclass(frozen=True)
@@ -48,6 +55,7 @@ class Phase2ParticipantArtifact:
     stake_commitment: StakeCommitment
     decrypt_key_share: DecryptKeyShare
     share_public_key: SharePublicKey
+    random_seed_commitment: RandomSeedCommitment
     random_seed_contribution: RandomSeedContribution
 
 
@@ -56,5 +64,6 @@ class Phase2Result:
     commitments: Dict[str, StakeCommitment]
     distributed_key_result: DistributedKeyGenerationResult
     random_seed: str
+    random_seed_commitments: Dict[str, RandomSeedCommitment]
     random_seed_contributions: Dict[str, RandomSeedContribution]
     participant_artifacts: List[Phase2ParticipantArtifact]

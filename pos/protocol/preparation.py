@@ -12,6 +12,7 @@ from pos.models.stage2 import (
     Participant,
     Phase2ParticipantArtifact,
     Phase2Result,
+    RandomSeedCommitment,
     RandomSeedContribution,
     StakeCommitment,
 )
@@ -61,20 +62,32 @@ def step2_distributed_generate_keys(
 def step3_distributed_generate_random_seed(
     pp: PublicParameters,
     participants: List[Participant],
-) -> tuple[str, Dict[str, RandomSeedContribution]]:
+) -> tuple[str, Dict[str, RandomSeedCommitment], Dict[str, RandomSeedContribution]]:
     """
     对应专利步骤3：分布式生成随机种子。
+
+    本版使用 commit-reveal：先为每方生成随机值承诺，再验证揭示并聚合成公共随机种子。
     """
     seed_generator = RandomSeedGenerator()
-    contributions: List[RandomSeedContribution] = [
-        seed_generator.generate_contribution(pp=pp, participant=participant)
-        for participant in participants
-    ]
-    random_seed = seed_generator.combine_contributions(pp=pp, contributions=contributions)
-    contribution_mapping: Dict[str, RandomSeedContribution] = (
-        seed_generator.contributions_to_mapping(contributions)
+    commitments: List[RandomSeedCommitment] = []
+    contributions: List[RandomSeedContribution] = []
+
+    for participant in participants:
+        commitment, contribution = seed_generator.generate_commitment_and_contribution(
+            pp=pp,
+            participant=participant,
+        )
+        commitments.append(commitment)
+        contributions.append(contribution)
+
+    random_seed = seed_generator.combine_contributions(
+        pp=pp,
+        commitments=commitments,
+        contributions=contributions,
     )
-    return random_seed, contribution_mapping
+    commitment_mapping = seed_generator.commitments_to_mapping(commitments)
+    contribution_mapping = seed_generator.contributions_to_mapping(contributions)
+    return random_seed, commitment_mapping, contribution_mapping
 
 
 def run_phase2_preparation(
@@ -97,9 +110,11 @@ def run_phase2_preparation(
         participants=participants,
         threshold=threshold,
     )
-    random_seed, random_seed_contributions = step3_distributed_generate_random_seed(
-        pp=pp,
-        participants=participants,
+    random_seed, random_seed_commitments, random_seed_contributions = (
+        step3_distributed_generate_random_seed(
+            pp=pp,
+            participants=participants,
+        )
     )
 
     participant_artifacts: List[Phase2ParticipantArtifact] = []
@@ -111,6 +126,7 @@ def run_phase2_preparation(
                 stake_commitment=commitments[participant_id],
                 decrypt_key_share=distributed_key_result.decrypt_key_shares[participant_id],
                 share_public_key=distributed_key_result.share_public_keys[participant_id],
+                random_seed_commitment=random_seed_commitments[participant_id],
                 random_seed_contribution=random_seed_contributions[participant_id],
             )
         )
@@ -119,6 +135,7 @@ def run_phase2_preparation(
         commitments=commitments,
         distributed_key_result=distributed_key_result,
         random_seed=random_seed,
+        random_seed_commitments=random_seed_commitments,
         random_seed_contributions=random_seed_contributions,
         participant_artifacts=participant_artifacts,
     )
