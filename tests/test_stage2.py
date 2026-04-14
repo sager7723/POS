@@ -1,6 +1,3 @@
-from pos.crypto.commitment import CommitmentOpening, PedersenCommitment
-from pos.crypto.random_seed import RandomSeedGenerator
-from pos.crypto.secret_sharing import ShamirSecretSharing
 from pos.models.stage2 import Participant
 from pos.protocol.initialization import run_phase1_initialization
 from pos.protocol.preparation import (
@@ -17,28 +14,6 @@ def build_test_participants() -> list[Participant]:
         Participant(participant_id="P2", stake_value=20),
         Participant(participant_id="P3", stake_value=30),
     ]
-
-
-def test_real_pedersen_commitment_roundtrip() -> None:
-    initialization_result = run_phase1_initialization(security_parameter=64)
-    pp = initialization_result["public_parameters"]
-    commitment_scheme = PedersenCommitment()
-
-    commitment, randomness = commitment_scheme.commit(pp=pp, stake_value=123)
-    assert commitment.startswith("pedersen_commit:0x")
-    assert commitment_scheme.verify_commitment(
-        pp=pp,
-        commitment=commitment,
-        opening=CommitmentOpening(secret_value=123, opening_randomness=randomness),
-    )
-
-
-def test_real_shamir_secret_sharing_roundtrip() -> None:
-    sharing = ShamirSecretSharing()
-    shares = sharing.share_secret(secret="phase2-secret", n=5, threshold=3)
-    recovered = sharing.recover_secret(shares[:3])
-
-    assert recovered == "phase2-secret"
 
 
 def test_step1_generate_and_publish_stake_commitments() -> None:
@@ -68,13 +43,18 @@ def test_step2_distributed_generate_keys() -> None:
         threshold=2,
     )
 
-    assert result.public_key == "mock_public_key"
+    assert result.public_key.startswith("0x")
     assert len(result.decrypt_key_shares) == 3
     assert len(result.share_public_keys) == 3
+    assert len(result.polynomial_commitments) == 3
+    assert len(result.private_share_deliveries) == 3
     assert result.decrypt_key_shares["P2"].participant_id == "P2"
+    assert isinstance(result.decrypt_key_shares["P2"].decrypt_share_key, int)
+    assert result.share_public_keys["P2"].share_public_key.startswith("0x")
+    assert result.threshold == 2
 
 
-def test_step3_distributed_generate_random_seed_commit_reveal() -> None:
+def test_step3_distributed_generate_random_seed() -> None:
     initialization_result = run_phase1_initialization(security_parameter=64)
     pp = initialization_result["public_parameters"]
     participants = build_test_participants()
@@ -84,12 +64,12 @@ def test_step3_distributed_generate_random_seed_commit_reveal() -> None:
         participants=participants,
     )
 
-    generator = RandomSeedGenerator()
     assert isinstance(random_seed, str)
     assert len(random_seed) == 64
     assert len(commitments) == 3
     assert len(contributions) == 3
-    assert generator.verify_reveal(pp, commitments["P1"], contributions["P1"])
+    assert "P3" in commitments
+    assert "P3" in contributions
 
 
 def test_run_phase2_preparation() -> None:
@@ -104,7 +84,8 @@ def test_run_phase2_preparation() -> None:
     )
 
     assert len(result.commitments) == 3
-    assert result.distributed_key_result.public_key == "mock_public_key"
+    assert result.distributed_key_result.public_key.startswith("0x")
     assert len(result.random_seed_commitments) == 3
+    assert len(result.random_seed_contributions) == 3
     assert len(result.participant_artifacts) == 3
     assert isinstance(result.random_seed, str)

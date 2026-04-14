@@ -63,19 +63,21 @@ def step0_setup(security_parameter: int) -> PublicParameters:
     """
     对应专利步骤0：生成公共参数。
 
-    本版把承诺/分享/随机源依赖的群参数固定成真正可用的 safe-prime 模乘群配置，
-    从而让 Pedersen 承诺与后续指数型恢复有真实数学基础。
+    为了支撑真实 Pedersen 承诺、Shamir 指数恢复和 DKG 份额验证，
+    这里将群参数固定为 safe-prime 模乘群上的 q 阶子群。
     """
     if security_parameter <= 128:
         p = RFC3526_GROUP14_P
         k = 630
         m = 4096
         N = 1024
+        normalized_security_parameter = 128
     else:
         p = RFC3526_GROUP15_P
         k = 750
         m = 6144
         N = 2048
+        normalized_security_parameter = 192
 
     q = _derive_q(p)
     g = _derive_generator_of_order_q(p, q, "PSSLE:G:g")
@@ -85,7 +87,7 @@ def step0_setup(security_parameter: int) -> PublicParameters:
     g_prime = _derive_generator_of_order_q(p, q, "PSSLE:Gprime:g")
 
     return PublicParameters(
-        security_parameter=128 if security_parameter <= 128 else 192,
+        security_parameter=normalized_security_parameter,
         p=p,
         q=q,
         G="SafePrimeSubgroupG",

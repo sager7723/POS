@@ -18,6 +18,19 @@ class StakeCommitment:
 
 
 @dataclass(frozen=True)
+class PolynomialCommitmentBroadcast:
+    participant_id: str
+    coefficient_commitments: List[str]
+
+
+@dataclass(frozen=True)
+class PrivateShareDelivery:
+    sender_id: str
+    recipient_id: str
+    share_value: int
+
+
+@dataclass(frozen=True)
 class SharePublicKey:
     participant_id: str
     share_public_key: str
@@ -26,7 +39,7 @@ class SharePublicKey:
 @dataclass(frozen=True)
 class DecryptKeyShare:
     participant_id: str
-    decrypt_share_key: str
+    decrypt_share_key: int
 
 
 @dataclass(frozen=True)
@@ -34,6 +47,9 @@ class DistributedKeyGenerationResult:
     public_key: str
     decrypt_key_shares: Dict[str, DecryptKeyShare]
     share_public_keys: Dict[str, SharePublicKey]
+    polynomial_commitments: Dict[str, PolynomialCommitmentBroadcast]
+    private_share_deliveries: Dict[str, Dict[str, PrivateShareDelivery]]
+    threshold: int
 
 
 @dataclass(frozen=True)

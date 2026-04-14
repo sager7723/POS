@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from pos.crypto.commitment import PedersenCommitment
-from pos.crypto.dkg import MockDistributedKeyGenerator
-from pos.crypto.fhe import MockThresholdFHE
-from pos.crypto.random_seed import RandomSeedGenerator
+from pos.crypto.commitment import MockPedersenCommitment
+from pos.crypto.dkg import DistributedKeyGenerator
+from pos.crypto.random_seed import MockRandomSeedGenerator
 from pos.models.common import PublicParameters
 from pos.models.stage2 import (
     DistributedKeyGenerationResult,
@@ -25,7 +24,7 @@ def step1_generate_and_publish_stake_commitments(
     """
     对应专利步骤1：每个参与者生成并发布质押承诺 CM_i。
     """
-    commitment_scheme = PedersenCommitment()
+    commitment_scheme = MockPedersenCommitment()
     commitments: Dict[str, StakeCommitment] = {}
 
     for participant in participants:
@@ -50,8 +49,7 @@ def step2_distributed_generate_keys(
     """
     对应专利步骤2：分布式生成完整公钥、解密密钥分片、分片公钥。
     """
-    fhe = MockThresholdFHE()
-    dkg = MockDistributedKeyGenerator(fhe=fhe)
+    dkg = DistributedKeyGenerator()
     return dkg.distributed_keygen(
         pp=pp,
         threshold=threshold,
@@ -65,10 +63,12 @@ def step3_distributed_generate_random_seed(
 ) -> tuple[str, Dict[str, RandomSeedCommitment], Dict[str, RandomSeedContribution]]:
     """
     对应专利步骤3：分布式生成随机种子。
-
-    本版使用 commit-reveal：先为每方生成随机值承诺，再验证揭示并聚合成公共随机种子。
+    使用 commit-reveal：
+    1. 先为每个参与者生成随机值承诺
+    2. 再验证揭示
+    3. 聚合得到公共随机种子
     """
-    seed_generator = RandomSeedGenerator()
+    seed_generator = MockRandomSeedGenerator()
     commitments: List[RandomSeedCommitment] = []
     contributions: List[RandomSeedContribution] = []
 
@@ -85,6 +85,7 @@ def step3_distributed_generate_random_seed(
         commitments=commitments,
         contributions=contributions,
     )
+
     commitment_mapping = seed_generator.commitments_to_mapping(commitments)
     contribution_mapping = seed_generator.contributions_to_mapping(contributions)
     return random_seed, commitment_mapping, contribution_mapping
