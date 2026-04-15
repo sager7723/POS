@@ -25,10 +25,6 @@ def step4_generate_prf_shares(
     random_seed: str,
     key_shares: Dict[str, int],
 ) -> Dict[str, PRFShare]:
-    """
-    对应专利步骤4：生成伪随机数分片。
-    使用阶段2中真实 DKG 产生的标量密钥份额，生成 LWE 风格 key-homomorphic PRF 分片。
-    """
     prf = MockKeyHomomorphicPRF()
     return {
         participant.participant_id: prf.generate_prf_share(
@@ -46,9 +42,6 @@ def step5_encrypt_prf_shares_and_generate_proof_shares(
     prf_shares: Dict[str, PRFShare],
     proof_share_count: int,
 ) -> Dict[str, EncryptedPRFShareArtifact]:
-    """
-    对应专利步骤5：加密伪随机数分片并生成 ZK 证明分片。
-    """
     fhe = MockThresholdFHE()
     proof_generator = MockProofShareGenerator()
 
@@ -58,6 +51,7 @@ def step5_encrypt_prf_shares_and_generate_proof_shares(
             pk=public_key,
             value=prf_share.prf_share,
         ).payload
+
         proof_shares = proof_generator.build_proof_shares(
             secret_label="prf",
             secret_value=(
@@ -88,9 +82,6 @@ def step6_encrypt_stakes_and_generate_proof_shares(
     commitments: Dict[str, StakeCommitment],
     proof_share_count: int,
 ) -> Dict[str, EncryptedStakeArtifact]:
-    """
-    对应专利步骤6：加密质押值并生成相关 ZK 证明分片。
-    """
     fhe = MockThresholdFHE()
     proof_generator = MockProofShareGenerator()
 
@@ -134,9 +125,6 @@ def step7_generate_tickets_and_encrypt_suffixes(
     participants: List[Participant],
     proof_share_count: int,
 ) -> Dict[str, TicketArtifact]:
-    """
-    对应专利步骤7：生成票根、票根哈希并加密后半段。
-    """
     fhe = MockThresholdFHE()
     proof_generator = MockProofShareGenerator()
     ticket_builder = MockTicketBuilder(
@@ -162,9 +150,6 @@ def step8_generate_ticket_proof_shares_and_publish_candidate_messages(
     encrypted_stake_artifacts: Dict[str, EncryptedStakeArtifact],
     ticket_artifacts: Dict[str, TicketArtifact],
 ) -> Dict[str, CandidateMessage]:
-    """
-    对应专利步骤8：生成加密票根证明分片并发布参选消息。
-    """
     candidate_messages: Dict[str, CandidateMessage] = {}
 
     for participant in participants:
@@ -196,10 +181,6 @@ def run_phase3_candidacy(
     phase2_result: Phase2Result,
     proof_share_count: int,
 ) -> Phase3Result:
-    """
-    阶段3入口。
-    外部接口保持不变。
-    """
     public_key = phase2_result.distributed_key_result.public_key
     commitments = phase2_result.commitments
     random_seed = phase2_result.random_seed

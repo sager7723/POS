@@ -1,11 +1,11 @@
 from dataclasses import dataclass
-from typing import List
+from typing import Any
 
 
 @dataclass(frozen=True)
 class DecryptionShare:
     participant_id: str
-    share: str
+    share: Any
 
 
 @dataclass(frozen=True)

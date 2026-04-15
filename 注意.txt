@@ -1,0 +1,1 @@
+配套测试环境为WSL2和Ubuntu 24.04.4，对应的python版本为3.10（OpenFHE固定要求），对应的虚拟环境在 /home/sager/venvs/pos-openfhe310

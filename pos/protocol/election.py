@@ -3,7 +3,11 @@ from __future__ import annotations
 import random
 from typing import Dict, List
 
-from pos.crypto.fhe import MockThresholdFHE
+from pos.crypto.fhe import (
+    CiphertextVector,
+    FHEThresholdFacade,
+    initialize_fhe_backend,
+)
 from pos.models.stage3 import CandidateMessage
 from pos.models.stage4 import DecryptionShare, Phase4Result, ValidationResult
 
@@ -20,8 +24,8 @@ def step9_generate_random_seed() -> int:
 # ========================
 def step10_cut_and_choose_indices(T_prime: int, t_prime: int) -> List[int]:
     """
-    随机选择 t'-1 个索引
-    未在专利中确认具体 PRNG
+    随机选择 t'-1 个索引。
+    这里先保留随机抽样接口，后续第5层再把它与真实 commit-reveal 随机源绑定得更紧。
     """
     return random.sample(range(T_prime), t_prime - 1)
 
@@ -33,8 +37,8 @@ def step11_verify_proofs(
     candidate_messages: Dict[str, CandidateMessage],
 ) -> ValidationResult:
     """
-    mock：全部通过
-    未在专利中确认具体验证逻辑
+    当前仍保留证明验证占位。
+    第5层会把这里替换成真实 cut-and-choose / ZK 验证。
     """
     return ValidationResult(
         valid_participants={pid: True for pid in candidate_messages}
@@ -45,45 +49,49 @@ def step11_verify_proofs(
 # Step 12
 # ========================
 def step12_homomorphic_sum_stakes(
+    fhe: FHEThresholdFacade,
     candidate_messages: Dict[str, CandidateMessage],
 ) -> str:
-    fhe = MockThresholdFHE()
-    inputs = [msg.encrypted_stake for msg in candidate_messages.values()]
-    return fhe.evaluate("sum", inputs).payload
+    ciphertexts = [
+        fhe.deserialize_ciphertext(msg.encrypted_stake)
+        for msg in candidate_messages.values()
+    ]
+    total_cipher = fhe.homomorphic_sum(ciphertexts)
+    return fhe.serialize_ciphertext(total_cipher)
 
 
 # ========================
 # Step 13
 # ========================
 def step13_generate_decryption_shares(
-    participants: List[str],
+    fhe: FHEThresholdFacade,
+    participant_ids: List[str],
     ciphertext: str,
 ) -> List[DecryptionShare]:
-    return [
-        DecryptionShare(pid, f"share({pid},{ciphertext})")
-        for pid in participants
-    ]
+    ct = fhe.deserialize_ciphertext(ciphertext)
+    shares: List[DecryptionShare] = []
+    for participant_id in participant_ids:
+        share = fhe.decrypt_share(participant_id=participant_id, ciphertext=ct)
+        shares.append(
+            DecryptionShare(
+                participant_id=participant_id,
+                share=share,
+            )
+        )
+    return shares
 
 
 # ========================
 # Step 14
 # ========================
 def step14_recover_plaintext(
+    fhe: FHEThresholdFacade,
     shares: List[DecryptionShare],
-    candidate_messages: Dict[str, CandidateMessage],
+    ciphertext: str,
 ) -> int:
-    """
-    mock：直接用明文 stake 计算
-    ❗真实应来自解密
-    """
-    total = 0
-    for msg in candidate_messages.values():
-        # 从字符串解析 stake（mock）
-        # 未在专利中确认解析方式
-        if "stake(" in msg.encrypted_stake:
-            val = int(msg.encrypted_stake.split("stake(")[1].split(")")[0])
-            total += val
-    return total
+    ct = fhe.deserialize_ciphertext(ciphertext)
+    share_strings = [item.share for item in shares]
+    return fhe.decrypt(ciphertext=ct, shares=share_strings)
 
 
 # ========================
@@ -91,51 +99,67 @@ def step14_recover_plaintext(
 # ========================
 def step15_compute_scale_ratio(
     total_stake: int,
+    prf_modulus: int,
 ) -> float:
-    return 1.0 / max(total_stake, 1)
+    if total_stake <= 0:
+        raise ValueError("total_stake must be positive")
+    return total_stake / prf_modulus
 
 
 # ========================
 # Step 16
 # ========================
 def step16_combine_prf_ciphertexts(
+    fhe: FHEThresholdFacade,
     candidate_messages: Dict[str, CandidateMessage],
 ) -> str:
-    fhe = MockThresholdFHE()
-    inputs = [msg.encrypted_prf_share for msg in candidate_messages.values()]
-    return fhe.evaluate("combine_prf", inputs).payload
+    ciphertexts = [
+        fhe.deserialize_ciphertext(msg.encrypted_prf_share)
+        for msg in candidate_messages.values()
+    ]
+    combined_cipher = fhe.homomorphic_sum(ciphertexts)
+    return fhe.serialize_ciphertext(combined_cipher)
 
 
 # ========================
 # Step 17
 # ========================
 def step17_scale_random_ciphertext(
+    fhe: FHEThresholdFacade,
     combined_cipher: str,
     scale_ratio: float,
 ) -> str:
-    return f"scaled({combined_cipher},{scale_ratio})"
+    ct = fhe.deserialize_ciphertext(combined_cipher)
+    scaled = fhe.scale_ciphertext(ct, scale_ratio)
+    return fhe.serialize_ciphertext(scaled)
 
 
 # ========================
 # Step 18
 # ========================
 def step18_select_winner(
+    fhe: FHEThresholdFacade,
     candidate_messages: Dict[str, CandidateMessage],
-    total_stake: int,
+    scaled_random_ciphertext: str,
 ) -> str:
-    """
-    mock：按 stake 区间选择
-    """
-    rand = random.randint(0, total_stake - 1)
+    participant_ids = list(candidate_messages.keys())
 
-    cumulative = 0
-    for msg in candidate_messages.values():
-        stake = int(msg.encrypted_stake.split("stake(")[1].split(")")[0])
-        cumulative += stake
-        if rand < cumulative:
-            return msg.encrypted_ticket
+    stake_ciphertexts = [
+        fhe.deserialize_ciphertext(candidate_messages[pid].encrypted_stake)
+        for pid in participant_ids
+    ]
+    cumulative_stakes: CiphertextVector = fhe.prefix_sum(stake_ciphertexts)
 
-    return list(candidate_messages.values())[0].encrypted_ticket
+    random_ct = fhe.deserialize_ciphertext(scaled_random_ciphertext)
+    compare_bits: CiphertextVector = fhe.compare_lt_vector(random_ct, cumulative_stakes)
+
+    ticket_ciphertexts = [
+        fhe.deserialize_ciphertext(candidate_messages[pid].encrypted_ticket)
+        for pid in participant_ids
+    ]
+    winning_ticket_cipher = fhe.select_first_true(compare_bits, ticket_ciphertexts)
+
+    return fhe.serialize_ciphertext(winning_ticket_cipher)
 
 
 # ========================
@@ -146,6 +170,11 @@ def run_phase4_election(
     t_prime: int = 2,
     T_prime: int = 3,
 ) -> Phase4Result:
+    if not candidate_messages:
+        raise ValueError("candidate_messages must not be empty")
+
+    # 初始化 FHE 后端。当前会优先尝试真实后端；不可用时退到兼容后端。
+    fhe = initialize_fhe_backend(candidate_messages)
 
     # Step 9
     _ = step9_generate_random_seed()
@@ -161,27 +190,36 @@ def run_phase4_election(
         for pid, msg in candidate_messages.items()
         if validation.valid_participants[pid]
     }
+    if not valid_msgs:
+        raise ValueError("no valid candidate messages remain after verification")
 
     # Step 12
-    total_cipher = step12_homomorphic_sum_stakes(valid_msgs)
+    total_cipher = step12_homomorphic_sum_stakes(fhe, valid_msgs)
 
     # Step 13
-    shares = step13_generate_decryption_shares(list(valid_msgs.keys()), total_cipher)
+    shares = step13_generate_decryption_shares(
+        fhe,
+        list(valid_msgs.keys()),
+        total_cipher,
+    )
 
     # Step 14
-    total_stake = step14_recover_plaintext(shares, valid_msgs)
+    total_stake = step14_recover_plaintext(fhe, shares, total_cipher)
 
     # Step 15
-    ratio = step15_compute_scale_ratio(total_stake)
+    scale_ratio = step15_compute_scale_ratio(
+        total_stake=total_stake,
+        prf_modulus=fhe.get_plaintext_modulus(),
+    )
 
     # Step 16
-    combined_prf = step16_combine_prf_ciphertexts(valid_msgs)
+    combined_prf = step16_combine_prf_ciphertexts(fhe, valid_msgs)
 
     # Step 17
-    scaled_prf = step17_scale_random_ciphertext(combined_prf, ratio)
+    scaled_prf = step17_scale_random_ciphertext(fhe, combined_prf, scale_ratio)
 
     # Step 18
-    winner_ticket = step18_select_winner(valid_msgs, total_stake)
+    winner_ticket = step18_select_winner(fhe, valid_msgs, scaled_prf)
 
     return Phase4Result(
         total_stake_plaintext=total_stake,

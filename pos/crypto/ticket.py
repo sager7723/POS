@@ -11,16 +11,6 @@ from pos.spec import encode_ticket_preimage, hash_bytes, split_digest_hex
 
 
 class TicketBuilder:
-    """
-    对应专利步骤7、8。
-
-    票根规范：
-    1. 票根原像使用统一版本化二进制编码；
-    2. participant_id 和 nonce 都使用长度前缀；
-    3. 哈希函数固定取自 pp.hash_name；
-    4. 哈希十六进制字符串从中间等长拆分成 prefix/suffix。
-    """
-
     def __init__(self, fhe: MockThresholdFHE, proof_generator: MockProofShareGenerator) -> None:
         self._fhe = fhe
         self._proof_generator = proof_generator

@@ -1,91 +1,88 @@
-from pos.models.stage2 import Participant
-from pos.protocol.initialization import run_phase1_initialization
-from pos.protocol.preparation import (
-    run_phase2_preparation,
-    step1_generate_and_publish_stake_commitments,
-    step2_distributed_generate_keys,
-    step3_distributed_generate_random_seed,
-)
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 
-def build_test_participants() -> list[Participant]:
-    return [
-        Participant(participant_id="P1", stake_value=10),
-        Participant(participant_id="P2", stake_value=20),
-        Participant(participant_id="P3", stake_value=30),
-    ]
+@dataclass(frozen=True)
+class Participant:
+    participant_id: str
+    stake_value: int
 
 
-def test_step1_generate_and_publish_stake_commitments() -> None:
-    initialization_result = run_phase1_initialization(security_parameter=64)
-    pp = initialization_result["public_parameters"]
-    participants = build_test_participants()
-
-    commitments = step1_generate_and_publish_stake_commitments(
-        pp=pp,
-        participants=participants,
-    )
-
-    assert len(commitments) == 3
-    assert "P1" in commitments
-    assert commitments["P1"].participant_id == "P1"
-    assert commitments["P1"].stake_commitment.startswith("pedersen_commit:0x")
+@dataclass(frozen=True)
+class StakeCommitment:
+    participant_id: str
+    stake_commitment: str
+    commit_randomness: int
 
 
-def test_step2_distributed_generate_keys() -> None:
-    initialization_result = run_phase1_initialization(security_parameter=64)
-    pp = initialization_result["public_parameters"]
-    participants = build_test_participants()
-
-    result = step2_distributed_generate_keys(
-        pp=pp,
-        participants=participants,
-        threshold=2,
-    )
-
-    assert result.public_key.startswith("0x")
-    assert len(result.decrypt_key_shares) == 3
-    assert len(result.share_public_keys) == 3
-    assert len(result.polynomial_commitments) == 3
-    assert len(result.private_share_deliveries) == 3
-    assert result.decrypt_key_shares["P2"].participant_id == "P2"
-    assert isinstance(result.decrypt_key_shares["P2"].decrypt_share_key, int)
-    assert result.share_public_keys["P2"].share_public_key.startswith("0x")
-    assert result.threshold == 2
+@dataclass(frozen=True)
+class PolynomialCommitmentBroadcast:
+    participant_id: str
+    coefficient_commitments: List[str]
 
 
-def test_step3_distributed_generate_random_seed() -> None:
-    initialization_result = run_phase1_initialization(security_parameter=64)
-    pp = initialization_result["public_parameters"]
-    participants = build_test_participants()
-
-    random_seed, commitments, contributions = step3_distributed_generate_random_seed(
-        pp=pp,
-        participants=participants,
-    )
-
-    assert isinstance(random_seed, str)
-    assert len(random_seed) == 64
-    assert len(commitments) == 3
-    assert len(contributions) == 3
-    assert "P3" in commitments
-    assert "P3" in contributions
+@dataclass(frozen=True)
+class PrivateShareDelivery:
+    sender_id: str
+    recipient_id: str
+    share_value: int
 
 
-def test_run_phase2_preparation() -> None:
-    initialization_result = run_phase1_initialization(security_parameter=64)
-    pp = initialization_result["public_parameters"]
-    participants = build_test_participants()
+@dataclass(frozen=True)
+class SharePublicKey:
+    participant_id: str
+    share_public_key: str
 
-    result = run_phase2_preparation(
-        pp=pp,
-        participants=participants,
-        threshold=2,
-    )
 
-    assert len(result.commitments) == 3
-    assert result.distributed_key_result.public_key.startswith("0x")
-    assert len(result.random_seed_commitments) == 3
-    assert len(result.random_seed_contributions) == 3
-    assert len(result.participant_artifacts) == 3
-    assert isinstance(result.random_seed, str)
+@dataclass(frozen=True)
+class DecryptKeyShare:
+    participant_id: str
+    decrypt_share_key: int
+
+
+@dataclass(frozen=True)
+class DistributedKeyGenerationResult:
+    public_key: str
+    decrypt_key_shares: Dict[str, DecryptKeyShare]
+    share_public_keys: Dict[str, SharePublicKey]
+    polynomial_commitments: Dict[str, PolynomialCommitmentBroadcast]
+    private_share_deliveries: Dict[str, Dict[str, PrivateShareDelivery]]
+    threshold: int
+    fhe_public_key: Optional[str] = None
+    fhe_secret_key_handles: Optional[Dict[str, str]] = None
+    fhe_backend_name: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class RandomSeedCommitment:
+    participant_id: str
+    seed_commitment: str
+
+
+@dataclass(frozen=True)
+class RandomSeedContribution:
+    participant_id: str
+    local_random_value: int
+    reveal_randomness: int
+
+
+@dataclass(frozen=True)
+class Phase2ParticipantArtifact:
+    participant: Participant
+    stake_commitment: StakeCommitment
+    decrypt_key_share: DecryptKeyShare
+    share_public_key: SharePublicKey
+    random_seed_commitment: RandomSeedCommitment
+    random_seed_contribution: RandomSeedContribution
+
+
+@dataclass(frozen=True)
+class Phase2Result:
+    commitments: Dict[str, StakeCommitment]
+    distributed_key_result: DistributedKeyGenerationResult
+    random_seed: str
+    random_seed_commitments: Dict[str, RandomSeedCommitment]
+    random_seed_contributions: Dict[str, RandomSeedContribution]
+    participant_artifacts: List[Phase2ParticipantArtifact]

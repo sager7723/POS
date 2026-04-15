@@ -76,7 +76,8 @@ def test_step5_encrypt_prf_shares_and_generate_proof_shares() -> None:
     )
 
     assert len(result) == 3
-    assert result["P2"].encrypted_prf_share.startswith("enc(")
+    assert isinstance(result["P2"].encrypted_prf_share, str)
+    assert result["P2"].encrypted_prf_share != ""
     assert len(result["P2"].proof_shares) == 3
     assert len(result["P2"].share_public_key_set) == 3
 
@@ -92,7 +93,8 @@ def test_step6_encrypt_stakes_and_generate_proof_shares() -> None:
     )
 
     assert len(result) == 3
-    assert result["P3"].encrypted_stake.startswith("enc(")
+    assert isinstance(result["P3"].encrypted_stake, str)
+    assert result["P3"].encrypted_stake != ""
     assert len(result["P3"].stake_ciphertext_proof_shares) == 3
     assert len(result["P3"].commitment_consistency_proof_shares) == 3
 
@@ -109,7 +111,8 @@ def test_step7_generate_tickets_and_encrypt_suffixes() -> None:
 
     assert len(result) == 3
     assert result["P1"].ticket_hash_prefix != ""
-    assert result["P1"].encrypted_ticket_suffix.startswith("enc(")
+    assert isinstance(result["P1"].encrypted_ticket_suffix, str)
+    assert result["P1"].encrypted_ticket_suffix != ""
     assert len(result["P1"].ticket_proof_shares) == 3
     assert len(result["P1"].ticket_hash_prefix) == len(result["P1"].ticket_hash_suffix)
 
@@ -152,7 +155,8 @@ def test_step8_generate_ticket_proof_shares_and_publish_candidate_messages() -> 
 
     assert len(candidate_messages) == 3
     assert candidate_messages["P1"].participant_id == "P1"
-    assert candidate_messages["P1"].encrypted_ticket.startswith("enc(")
+    assert isinstance(candidate_messages["P1"].encrypted_ticket, str)
+    assert candidate_messages["P1"].encrypted_ticket != ""
     assert len(candidate_messages["P1"].ticket_proof_shares) == 3
 
 

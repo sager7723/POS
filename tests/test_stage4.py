@@ -20,5 +20,5 @@ def test_phase4():
     result = run_phase4_election(phase3.candidate_messages)
 
     assert result.total_stake_plaintext > 0
-    assert result.scaled_random_ciphertext.startswith("scaled(")
-    assert result.winning_ticket_ciphertext.startswith("enc(")
+    assert isinstance(result.scaled_random_ciphertext, str)
+    assert isinstance(result.winning_ticket_ciphertext, str)
