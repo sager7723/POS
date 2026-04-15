@@ -208,6 +208,12 @@ PRF 分片正确性
 
 先做半诚实版，再补恶意安全。
 
+
+解决方案：
+比较电路使用官方 EvalCompareSchemeSwitching
+选择电路不再走兼容后端，而是在 CKKS 上用“比较结果做 one-hot / first-true 选择”
+门限解密使用官方 MultipartyDecryptLead/Main/Fusion
+为了在你当前这个单进程 Python 原型里把阶段 B 真正跑通，这里用官方文档中的 MultipartyKeyGen(privateKeyVec) 重载来生成 joined keypair；官方文档明确写了这个重载“ONLY FOR DEBUGGING PURPOSES. SHOULD NOT BE USED IN PRODUCTION”，所以我会明确标注：这一步已经是真实数学计算基础，但距离最终分布式生产实现，还需要后续把步骤2里的 FHE 密钥生成和 OpenFHE 原生多方密钥流程完全统一。
 ——————————————————————————————————————————————————————————————————————————————————————————————
 
 第6层：把揭示与公开验证闭环补齐

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from pos.crypto.fhe import MockThresholdFHE
+from pos.crypto.fhe import MockThresholdFHE, prepare_fhe_backend_for_participants
 from pos.crypto.key_homomorphic_prf import MockKeyHomomorphicPRF
 from pos.crypto.proofs import MockProofShareGenerator
 from pos.crypto.ticket import MockTicketBuilder
@@ -188,6 +188,9 @@ def run_phase3_candidacy(
         participant_id: decrypt_key_share.decrypt_share_key
         for participant_id, decrypt_key_share in phase2_result.distributed_key_result.decrypt_key_shares.items()
     }
+
+    # 新增：在阶段3真正加密前，按参与者列表准备 FHE 会话。
+    prepare_fhe_backend_for_participants([participant.participant_id for participant in participants])
 
     prf_shares = step4_generate_prf_shares(
         pp=pp,
