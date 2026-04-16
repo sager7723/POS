@@ -26,7 +26,8 @@ def test_stage4_with_real_openfhe_backend() -> None:
 
         assert phase4.total_stake_plaintext == 60
         assert isinstance(phase4.scaled_random_ciphertext, str)
-        assert isinstance(phase4.winning_ticket_ciphertext, str)
+        assert isinstance(phase4.winning_ticket_ciphertext, list)
+        assert len(phase4.winning_ticket_ciphertext) > 0
     finally:
         os.environ["POS_FHE_BACKEND"] = "compatibility"
         reset_fhe_backend_cache()

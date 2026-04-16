@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Any
+from typing import Dict, List, Optional
 
-
-@dataclass(frozen=True)
-class DecryptionShare:
-    participant_id: str
-    share: Any
+from pos.models.stage4 import DecryptionShare
 
 
 @dataclass(frozen=True)
 class Phase5Result:
-    winner_id: str
-    ticket_preimage: str
-    verification_passed: bool
+    winning_ticket_ciphertext: List[str]
+    decryption_shares_by_chunk: Dict[int, List[DecryptionShare]]
+    recovered_ticket_suffix: str
+    winner_id: Optional[str]
+    revealed_ticket_preimage: Optional[str]
+    public_verification_passed: bool

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from pos.crypto.fhe import MockThresholdFHE, prepare_fhe_backend_for_participants
+from pos.crypto.fhe import MockThresholdFHE
 from pos.crypto.key_homomorphic_prf import MockKeyHomomorphicPRF
 from pos.crypto.proofs import MockProofShareGenerator
 from pos.crypto.ticket import MockTicketBuilder
@@ -25,6 +25,11 @@ def step4_generate_prf_shares(
     random_seed: str,
     key_shares: Dict[str, int],
 ) -> Dict[str, PRFShare]:
+    """
+    专利约束相关：
+    - PRF 分片必须绑定阶段2产生的密钥份额；
+    - 不能脱离前一阶段门限密钥材料单独生成。
+    """
     prf = MockKeyHomomorphicPRF()
     return {
         participant.participant_id: prf.generate_prf_share(
@@ -52,20 +57,24 @@ def step5_encrypt_prf_shares_and_generate_proof_shares(
             value=prf_share.prf_share,
         ).payload
 
+        prf_scalar = proof_generator.scalarize_value(prf_share.prf_share)
         proof_shares = proof_generator.build_proof_shares(
-            secret_label="prf",
-            secret_value=(
-                f"participant={participant_id}"
-                f"|key_share_scalar={prf_share.key_share_scalar}"
-                f"|public_vector_digest={prf_share.public_vector_digest}"
-                f"|prf_output={prf_share.prf_share_value}"
-            ),
+            statement_type="prf_share_correctness",
+            statement_public_data={
+                "participant_id": participant_id,
+                "public_key": public_key,
+                "encrypted_prf_share": encrypted_prf_share,
+            },
+            witness_values={
+                "prf_scalar": prf_scalar,
+            },
             proof_share_count=proof_share_count,
+            reveal_threshold=max(2, proof_share_count),
+            noise_estimate=0,
+            noise_bound=0,
         )
-        share_public_key_set = proof_generator.build_share_public_keys(
-            participant_id=participant_id,
-            proof_share_count=proof_share_count,
-        )
+        share_public_key_set = proof_generator.build_share_public_keys(proof_shares)
+
         artifacts[participant_id] = EncryptedPRFShareArtifact(
             participant_id=participant_id,
             encrypted_prf_share=encrypted_prf_share,
@@ -94,19 +103,37 @@ def step6_encrypt_stakes_and_generate_proof_shares(
         ).payload
 
         stake_ciphertext_proof_shares = proof_generator.build_proof_shares(
-            secret_label="stake_ciphertext",
-            secret_value=f"participant={participant_id}|stake={participant.stake_value}",
+            statement_type="ciphertext_encryption_correctness",
+            statement_public_data={
+                "participant_id": participant_id,
+                "public_key": public_key,
+                "ciphertext": encrypted_stake,
+                "plaintext_label": "stake",
+            },
+            witness_values={
+                "plaintext_scalar": participant.stake_value,
+            },
             proof_share_count=proof_share_count,
+            reveal_threshold=max(2, proof_share_count),
+            noise_estimate=0,
+            noise_bound=0,
         )
         commitment_consistency_proof_shares = proof_generator.build_proof_shares(
-            secret_label="stake_commitment_consistency",
-            secret_value=(
-                f"participant={participant_id}"
-                f"|stake={participant.stake_value}"
-                f"|commitment={commitments[participant_id].stake_commitment}"
-                f"|commit_randomness={commitments[participant_id].commit_randomness}"
-            ),
+            statement_type="stake_commitment_consistency",
+            statement_public_data={
+                "participant_id": participant_id,
+                "public_key": public_key,
+                "ciphertext": encrypted_stake,
+                "stake_commitment": commitments[participant_id].stake_commitment,
+            },
+            witness_values={
+                "stake_scalar": participant.stake_value,
+                "randomness_scalar": commitments[participant_id].commit_randomness,
+            },
             proof_share_count=proof_share_count,
+            reveal_threshold=max(2, proof_share_count),
+            noise_estimate=0,
+            noise_bound=0,
         )
 
         artifacts[participant_id] = EncryptedStakeArtifact(
@@ -163,7 +190,7 @@ def step8_generate_ticket_proof_shares_and_publish_candidate_messages(
             stake_commitment=commitments[participant_id],
             encrypted_stake=stake_artifact.encrypted_stake,
             encrypted_prf_share=prf_artifact.encrypted_prf_share,
-            encrypted_ticket=ticket_artifact.encrypted_ticket_suffix,
+            encrypted_ticket=ticket_artifact.encrypted_ticket_suffix_chunks,
             prf_proof_shares=prf_artifact.proof_shares,
             stake_ciphertext_proof_shares=stake_artifact.stake_ciphertext_proof_shares,
             commitment_consistency_proof_shares=stake_artifact.commitment_consistency_proof_shares,
@@ -184,13 +211,12 @@ def run_phase3_candidacy(
     public_key = phase2_result.distributed_key_result.public_key
     commitments = phase2_result.commitments
     random_seed = phase2_result.random_seed
+
+    # 从阶段2结果中提取密钥份额，供第3阶段 PRF 分片生成使用
     key_shares = {
         participant_id: decrypt_key_share.decrypt_share_key
         for participant_id, decrypt_key_share in phase2_result.distributed_key_result.decrypt_key_shares.items()
     }
-
-    # 新增：在阶段3真正加密前，按参与者列表准备 FHE 会话。
-    prepare_fhe_backend_for_participants([participant.participant_id for participant in participants])
 
     prf_shares = step4_generate_prf_shares(
         pp=pp,

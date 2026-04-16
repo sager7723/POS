@@ -21,4 +21,5 @@ def test_phase4():
 
     assert result.total_stake_plaintext > 0
     assert isinstance(result.scaled_random_ciphertext, str)
-    assert isinstance(result.winning_ticket_ciphertext, str)
+    assert isinstance(result.winning_ticket_ciphertext, list)
+    assert len(result.winning_ticket_ciphertext) > 0

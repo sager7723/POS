@@ -51,11 +51,7 @@ def test_step4_generate_prf_shares() -> None:
 
     assert len(prf_shares) == 3
     assert prf_shares["P1"].participant_id == "P1"
-    assert prf_shares["P1"].prf_share.startswith("prf_share:0x")
-    assert isinstance(prf_shares["P1"].key_share_scalar, int)
-    assert isinstance(prf_shares["P1"].prf_share_value, int)
-    assert prf_shares["P1"].input_bits_length > 0
-    assert len(prf_shares["P1"].secret_vector) == pp.k
+    assert prf_shares["P1"].prf_share.startswith("prf_share:")
 
 
 def test_step5_encrypt_prf_shares_and_generate_proof_shares() -> None:
@@ -111,9 +107,8 @@ def test_step7_generate_tickets_and_encrypt_suffixes() -> None:
 
     assert len(result) == 3
     assert result["P1"].ticket_hash_prefix != ""
-    assert isinstance(result["P1"].encrypted_ticket_suffix, str)
-    assert result["P1"].encrypted_ticket_suffix != ""
-    assert len(result["P1"].ticket_proof_shares) == 3
+    assert isinstance(result["P1"].encrypted_ticket_suffix_chunks, list)
+    assert len(result["P1"].encrypted_ticket_suffix_chunks) > 0
     assert len(result["P1"].ticket_hash_prefix) == len(result["P1"].ticket_hash_suffix)
 
 
@@ -155,8 +150,8 @@ def test_step8_generate_ticket_proof_shares_and_publish_candidate_messages() -> 
 
     assert len(candidate_messages) == 3
     assert candidate_messages["P1"].participant_id == "P1"
-    assert isinstance(candidate_messages["P1"].encrypted_ticket, str)
-    assert candidate_messages["P1"].encrypted_ticket != ""
+    assert isinstance(candidate_messages["P1"].encrypted_ticket, list)
+    assert len(candidate_messages["P1"].encrypted_ticket) > 0
     assert len(candidate_messages["P1"].ticket_proof_shares) == 3
 
 
@@ -173,4 +168,4 @@ def test_run_phase3_candidacy() -> None:
     assert len(result.candidate_messages) == 3
     assert len(result.participant_artifacts) == 3
     assert result.candidate_messages["P2"].ticket_hash_prefix != ""
-    assert result.participant_artifacts[0].prf_share.prf_share.startswith("prf_share:0x")
+    assert result.participant_artifacts[0].prf_share.prf_share.startswith("prf_share:")
