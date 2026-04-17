@@ -135,6 +135,9 @@ def run_phase2_preparation(
     return Phase2Result(
         commitments=commitments,
         distributed_key_result=distributed_key_result,
+        complete_public_key=distributed_key_result.public_key,
+        threshold_fhe_private_key_shares=distributed_key_result.threshold_fhe_private_key_shares,
+        share_public_keys=distributed_key_result.share_public_keys,
         random_seed=random_seed,
         random_seed_commitments=random_seed_commitments,
         random_seed_contributions=random_seed_contributions,

@@ -66,9 +66,10 @@ def test_step5_encrypt_prf_shares_and_generate_proof_shares() -> None:
     )
 
     result = step5_encrypt_prf_shares_and_generate_proof_shares(
-        public_key=phase2_result.distributed_key_result.public_key,
+        public_key=phase2_result.complete_public_key,
         prf_shares=prf_shares,
         proof_share_count=3,
+        distributed_key_result=phase2_result.distributed_key_result,
     )
 
     assert len(result) == 3
@@ -82,10 +83,11 @@ def test_step6_encrypt_stakes_and_generate_proof_shares() -> None:
     _, participants, phase2_result = prepare_phase2_inputs()
 
     result = step6_encrypt_stakes_and_generate_proof_shares(
-        public_key=phase2_result.distributed_key_result.public_key,
+        public_key=phase2_result.complete_public_key,
         participants=participants,
         commitments=phase2_result.commitments,
         proof_share_count=3,
+        distributed_key_result=phase2_result.distributed_key_result,
     )
 
     assert len(result) == 3
@@ -100,9 +102,10 @@ def test_step7_generate_tickets_and_encrypt_suffixes() -> None:
 
     result = step7_generate_tickets_and_encrypt_suffixes(
         pp=pp,
-        public_key=phase2_result.distributed_key_result.public_key,
+        public_key=phase2_result.complete_public_key,
         participants=participants,
         proof_share_count=3,
+        distributed_key_result=phase2_result.distributed_key_result,
     )
 
     assert len(result) == 3
@@ -123,21 +126,24 @@ def test_step8_generate_ticket_proof_shares_and_publish_candidate_messages() -> 
         key_shares=key_shares,
     )
     encrypted_prf = step5_encrypt_prf_shares_and_generate_proof_shares(
-        public_key=phase2_result.distributed_key_result.public_key,
+        public_key=phase2_result.complete_public_key,
         prf_shares=prf_shares,
         proof_share_count=3,
+        distributed_key_result=phase2_result.distributed_key_result,
     )
     encrypted_stake = step6_encrypt_stakes_and_generate_proof_shares(
-        public_key=phase2_result.distributed_key_result.public_key,
+        public_key=phase2_result.complete_public_key,
         participants=participants,
         commitments=phase2_result.commitments,
         proof_share_count=3,
+        distributed_key_result=phase2_result.distributed_key_result,
     )
     tickets = step7_generate_tickets_and_encrypt_suffixes(
         pp=pp,
-        public_key=phase2_result.distributed_key_result.public_key,
+        public_key=phase2_result.complete_public_key,
         participants=participants,
         proof_share_count=3,
+        distributed_key_result=phase2_result.distributed_key_result,
     )
 
     candidate_messages = step8_generate_ticket_proof_shares_and_publish_candidate_messages(

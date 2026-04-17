@@ -17,12 +17,14 @@ def test_phase5():
 
     phase2 = run_phase2_preparation(pp, participants, 2)
     phase3 = run_phase3_candidacy(pp, participants, phase2, 3)
-    phase4 = run_phase4_election(phase3.candidate_messages)
+    phase4 = run_phase4_election(phase2, phase3.candidate_messages)
 
     result = run_phase5_reveal(
-        phase3.candidate_messages,
-        phase4.winning_ticket_ciphertext,
+        pp=pp,
+        phase2_result=phase2,
+        phase3_result=phase3,
+        phase4_result=phase4,,
     )
 
     assert result.winner_id in ["P1", "P2", "P3"]
-    assert result.verification_passed is True
+    assert result.public_verification_passed is True

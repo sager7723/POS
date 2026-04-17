@@ -1,88 +1,47 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Dict, List, Optional
-
-
-@dataclass(frozen=True)
-class Participant:
-    participant_id: str
-    stake_value: int
+from pos.models.stage2 import Participant
+from pos.protocol.initialization import run_phase1_initialization
+from pos.protocol.preparation import run_phase2_preparation
 
 
-@dataclass(frozen=True)
-class StakeCommitment:
-    participant_id: str
-    stake_commitment: str
-    commit_randomness: int
+def test_phase2_outputs_explicit_unified_key_material() -> None:
+    pp = run_phase1_initialization()["public_parameters"]
+    participants = [
+        Participant("P1", 10),
+        Participant("P2", 20),
+        Participant("P3", 30),
+    ]
+
+    phase2 = run_phase2_preparation(pp=pp, participants=participants, threshold=2)
+
+    assert phase2.complete_public_key == phase2.distributed_key_result.public_key
+    assert phase2.distributed_key_result.fhe_backend_name == "compatibility"
+    assert phase2.distributed_key_result.fhe_keyset_reference is not None
+
+    assert set(phase2.threshold_fhe_private_key_shares.keys()) == {"P1", "P2", "P3"}
+    assert set(phase2.share_public_keys.keys()) == {"P1", "P2", "P3"}
+
+    for participant_id, private_share in phase2.threshold_fhe_private_key_shares.items():
+        assert private_share.participant_id == participant_id
+        assert private_share.fhe_private_key_share != ""
+        assert private_share.decrypt_share_key >= 0
+        assert (
+            private_share.corresponding_share_public_key
+            == phase2.share_public_keys[participant_id].share_public_key
+        )
+        assert private_share.backend_name == phase2.distributed_key_result.fhe_backend_name
+        assert private_share.key_material_reference == phase2.distributed_key_result.fhe_keyset_reference
 
 
-@dataclass(frozen=True)
-class PolynomialCommitmentBroadcast:
-    participant_id: str
-    coefficient_commitments: List[str]
+def test_phase2_decrypt_key_share_alias_remains_compatible() -> None:
+    pp = run_phase1_initialization()["public_parameters"]
+    participants = [
+        Participant("P1", 11),
+        Participant("P2", 22),
+        Participant("P3", 33),
+    ]
 
+    phase2 = run_phase2_preparation(pp=pp, participants=participants, threshold=2)
+    alias_map = phase2.distributed_key_result.decrypt_key_shares
 
-@dataclass(frozen=True)
-class PrivateShareDelivery:
-    sender_id: str
-    recipient_id: str
-    share_value: int
-
-
-@dataclass(frozen=True)
-class SharePublicKey:
-    participant_id: str
-    share_public_key: str
-
-
-@dataclass(frozen=True)
-class DecryptKeyShare:
-    participant_id: str
-    decrypt_share_key: int
-
-
-@dataclass(frozen=True)
-class DistributedKeyGenerationResult:
-    public_key: str
-    decrypt_key_shares: Dict[str, DecryptKeyShare]
-    share_public_keys: Dict[str, SharePublicKey]
-    polynomial_commitments: Dict[str, PolynomialCommitmentBroadcast]
-    private_share_deliveries: Dict[str, Dict[str, PrivateShareDelivery]]
-    threshold: int
-    fhe_public_key: Optional[str] = None
-    fhe_secret_key_handles: Optional[Dict[str, str]] = None
-    fhe_backend_name: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class RandomSeedCommitment:
-    participant_id: str
-    seed_commitment: str
-
-
-@dataclass(frozen=True)
-class RandomSeedContribution:
-    participant_id: str
-    local_random_value: int
-    reveal_randomness: int
-
-
-@dataclass(frozen=True)
-class Phase2ParticipantArtifact:
-    participant: Participant
-    stake_commitment: StakeCommitment
-    decrypt_key_share: DecryptKeyShare
-    share_public_key: SharePublicKey
-    random_seed_commitment: RandomSeedCommitment
-    random_seed_contribution: RandomSeedContribution
-
-
-@dataclass(frozen=True)
-class Phase2Result:
-    commitments: Dict[str, StakeCommitment]
-    distributed_key_result: DistributedKeyGenerationResult
-    random_seed: str
-    random_seed_commitments: Dict[str, RandomSeedCommitment]
-    random_seed_contributions: Dict[str, RandomSeedContribution]
-    participant_artifacts: List[Phase2ParticipantArtifact]
+    assert alias_map is phase2.distributed_key_result.threshold_fhe_private_key_shares
+    assert all(share.decrypt_share_key == share.secret_share_scalar for share in alias_map.values())

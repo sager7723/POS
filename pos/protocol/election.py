@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import random
-from dataclasses import replace
 from typing import Dict, List, Optional
 
 from pos.crypto.fhe import FHEThresholdFacade, initialize_fhe_backend
 from pos.crypto.proofs import MockProofShareGenerator
+from pos.models.stage2 import Phase2Result
 from pos.models.stage3 import CandidateMessage, PublicProofShare
 from pos.models.stage4 import DecryptionShare, Phase4Result, ProofVerificationRecord, ValidationResult
 
@@ -19,7 +19,7 @@ def step9_generate_random_seed(
 
     两种模式：
     1. 不传 candidate_messages：返回随机种子（兼容主流程调用）
-    2. 传 candidate_messages：对候选消息公共字段做确定性哈希（供 cut-and-choose 测试/验证）
+    2. 传 candidate_messages：对候选消息公共字段做确定性哈希（供 formal proof 验证）
     """
     if candidate_messages is None:
         return f"{random.randint(1, 10**6):x}"
@@ -27,11 +27,7 @@ def step9_generate_random_seed(
     payload_parts: List[str] = []
     for participant_id in sorted(candidate_messages.keys()):
         message = candidate_messages[participant_id]
-        ticket_payload = (
-            "|".join(message.encrypted_ticket)
-            if isinstance(message.encrypted_ticket, list)
-            else str(message.encrypted_ticket)
-        )
+        ticket_payload = "|".join(message.encrypted_ticket)
         payload_parts.append(
             "|".join(
                 [
@@ -39,6 +35,7 @@ def step9_generate_random_seed(
                     message.encrypted_prf_share,
                     message.encrypted_stake,
                     ticket_payload,
+                    message.stake_commitment.stake_commitment,
                     message.ticket_hash_prefix,
                 ]
             )
@@ -49,23 +46,23 @@ def step9_generate_random_seed(
 
 
 def step10_cut_and_choose_indices(T_prime: int, t_prime: int) -> List[int]:
+    """
+    保留旧接口以兼容外部调用。
+    主流程中真正使用的揭示索引，已经改为 proofs.py 中对专利 `PRNG(seed, T', t'-1)`
+    的工程化确定性实现。
+    """
     return random.sample(range(T_prime), t_prime - 1)
 
 
-def _step10_select_revealed_proof_shares(
+def _step10_derive_reveal_plan(
     validation_seed: str,
     candidate_messages: Dict[str, CandidateMessage],
 ) -> Dict[str, Dict[str, List[PublicProofShare]]]:
-    """
-    第5层真实验证支撑：
-    根据验证种子，按 proof system 的索引导出逻辑，揭示 t'-1 个 proof shares。
-    """
     proof_system = MockProofShareGenerator()
     revealed: Dict[str, Dict[str, List[PublicProofShare]]] = {}
 
     for participant_id, message in candidate_messages.items():
         participant_reveals: Dict[str, List[PublicProofShare]] = {}
-
         labeled_bundles = [
             ("prf_share_correctness", message.prf_proof_shares),
             ("stake_ciphertext_correctness", message.stake_ciphertext_proof_shares),
@@ -77,7 +74,6 @@ def _step10_select_revealed_proof_shares(
             if not proof_shares:
                 participant_reveals[statement_label] = []
                 continue
-
             reveal_indices = proof_system.derive_reveal_indices(
                 validation_seed=validation_seed,
                 participant_id=participant_id,
@@ -89,10 +85,26 @@ def _step10_select_revealed_proof_shares(
                 proof_shares,
                 reveal_indices,
             )
-
         revealed[participant_id] = participant_reveals
 
     return revealed
+
+
+def _ticket_expected_public_binding(message: CandidateMessage) -> Dict[str, str]:
+    layout = message.ticket_cipher_layout
+    return {
+        "proof_label": "ticket_suffix_ciphertext",
+        "plaintext_label": "ticket_hash_suffix_chunk_words",
+        "encoding_family": layout.encoding_family,
+        "chunk_bit_width": str(layout.chunk_bit_width),
+        "chunk_count": str(layout.chunk_count),
+        "hex_chars_per_chunk": str(layout.hex_chars_per_chunk),
+        "chunk_modulus": str(layout.chunk_modulus),
+        "packing_mode": layout.packing_mode,
+        "slot_packing": str(layout.slot_packing).lower(),
+        "byte_order": layout.byte_order,
+        "recovery_format": layout.recovery_format,
+    }
 
 
 def step11_verify_proofs(
@@ -100,19 +112,10 @@ def step11_verify_proofs(
     candidate_messages: Dict[str, CandidateMessage],
 ) -> ValidationResult:
     """
-    步骤11：验证揭示值。
-
-    验证项：
-    - Feldman 多项式承诺一致性
-    - share_commitment 一致性
-    - share_public_key 一致性
-    - PRF public key vector 一致性
-    - relation commitment 一致性
-    - 噪声范围检查
-    - 当揭示份额足够时做恢复验证
+    步骤11：验证正式方程级证明。
     """
     proof_system = MockProofShareGenerator()
-    revealed = _step10_select_revealed_proof_shares(validation_seed, candidate_messages)
+    revealed = _step10_derive_reveal_plan(validation_seed, candidate_messages)
 
     valid_participants: Dict[str, bool] = {}
     verification_records: Dict[str, List[ProofVerificationRecord]] = {}
@@ -120,35 +123,38 @@ def step11_verify_proofs(
     for participant_id, message in candidate_messages.items():
         participant_records: List[ProofVerificationRecord] = []
 
-        prf_record = proof_system.verify_revealed_shares(
+        prf_record = proof_system.verify_prf_share_proof(
             message.prf_proof_shares,
             revealed[participant_id]["prf_share_correctness"],
-        )
-        declared_public_key_vector_ok = (
-            message.prf_share_public_keys
-            == proof_system.build_share_public_keys(message.prf_proof_shares)
-        )
-        prf_record = replace(
-            prf_record,
-            declared_public_key_vector_ok=declared_public_key_vector_ok,
+            expected_ciphertext=message.encrypted_prf_share,
+            expected_public_key_vector=message.prf_share_public_keys,
         )
         participant_records.append(prf_record)
 
-        stake_cipher_record = proof_system.verify_revealed_shares(
+        stake_cipher_record = proof_system.verify_ciphertext_encryption_proof(
             message.stake_ciphertext_proof_shares,
             revealed[participant_id]["stake_ciphertext_correctness"],
+            expected_ciphertexts=[message.encrypted_stake],
+            expected_extra_public_data={
+                "proof_label": "stake_ciphertext",
+                "plaintext_label": "stake",
+            },
         )
         participant_records.append(stake_cipher_record)
 
-        commitment_record = proof_system.verify_revealed_shares(
+        commitment_record = proof_system.verify_stake_commitment_consistency_proof(
             message.commitment_consistency_proof_shares,
             revealed[participant_id]["stake_commitment_consistency"],
+            expected_ciphertext=message.encrypted_stake,
+            expected_commitment=message.stake_commitment.stake_commitment,
         )
         participant_records.append(commitment_record)
 
-        ticket_record = proof_system.verify_revealed_shares(
+        ticket_record = proof_system.verify_ciphertext_encryption_proof(
             message.ticket_proof_shares,
             revealed[participant_id]["ticket_ciphertext_correctness"],
+            expected_ciphertexts=message.encrypted_ticket,
+            expected_extra_public_data=_ticket_expected_public_binding(message),
         )
         participant_records.append(ticket_record)
 
@@ -160,6 +166,11 @@ def step11_verify_proofs(
             and record.relation_ok
             and record.noise_ok
             and record.recovery_ok
+            and record.ciphertext_equation_ok
+            and record.commitment_equation_ok
+            and record.discrete_log_key_ok
+            and record.secret_recover_ok
+            and record.public_binding_ok
             for record in participant_records
         )
         verification_records[participant_id] = participant_records
@@ -272,7 +283,12 @@ def step18_select_winner(
     return winning_chunks
 
 
+def _derive_round_id(validation_seed: str) -> str:
+    return f"round-{validation_seed[:12]}" if validation_seed else "round-unknown"
+
+
 def run_phase4_election(
+    phase2_result: Phase2Result,
     candidate_messages: Dict[str, CandidateMessage],
     t_prime: int = 2,
     T_prime: int = 3,
@@ -280,7 +296,7 @@ def run_phase4_election(
     if not candidate_messages:
         raise ValueError("candidate_messages must not be empty")
 
-    fhe = initialize_fhe_backend(candidate_messages)
+    fhe = initialize_fhe_backend(distributed_key_result=phase2_result.distributed_key_result)
 
     validation_seed = step9_generate_random_seed(candidate_messages)
     _ = step10_cut_and_choose_indices(T_prime, t_prime)
@@ -309,9 +325,14 @@ def run_phase4_election(
     scaled_prf = step17_scale_random_ciphertext(fhe, combined_prf, scale_ratio)
     winner_ticket = step18_select_winner(fhe, valid_msgs, scaled_prf)
 
+    proof_valid_candidate_ids = sorted(valid_msgs.keys())
+    round_id = _derive_round_id(validation_seed)
+
     return Phase4Result(
         total_stake_plaintext=total_stake,
         scaled_random_ciphertext=scaled_prf,
         winning_ticket_ciphertext=winner_ticket,
         validation_result=validation,
+        round_id=round_id,
+        proof_valid_candidate_ids=proof_valid_candidate_ids,
     )

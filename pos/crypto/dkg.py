@@ -3,37 +3,31 @@ from __future__ import annotations
 import secrets
 from typing import Dict, List
 
+from pos.crypto.fhe import build_threshold_key_material
 from pos.models.common import PublicParameters
 from pos.models.stage2 import (
-    DecryptKeyShare,
     DistributedKeyGenerationResult,
     Participant,
     PolynomialCommitmentBroadcast,
     PrivateShareDelivery,
     SharePublicKey,
+    ThresholdFHEPrivateKeyShare,
 )
 
 
 class DistributedKeyGenerator:
     """
-    基于整数群和 Feldman VSS 风格承诺的分布式密钥生成。
+    阶段2统一 DKG。
 
-    本实现对应专利步骤2中的真实数学流程：
-    1. 每个参与者 P_i 在 Z_q 上采样一个 (t-1) 次秘密多项式 f_i(x)
-    2. 广播系数承诺 C_{i,k} = g'^{a_{i,k}} mod p
-    3. 向每个接收方 P_j 私下发送分片 s_{i->j} = f_i(j) mod q
-    4. 接收方验证 g'^{s_{i->j}} == Π_k C_{i,k}^{j^k} mod p
-    5. 接收方把所有通过验证的分片求和，得到自己的解密份额 sk_j
-    6. 输出：
-       - 完整公钥 PK = Π_i C_{i,0} = g'^{Σ_i a_{i,0}} mod p
-       - 各方解密密钥分片 sk_j
-       - 各方分片公钥 pk_j = g'^{sk_j} mod p
+    当前实现策略：
+    1. 先保留 Feldman/VSS 风格的真实分布式秘密共享流程，得到每个参与者的聚合标量分片；
+    2. 再把这组参与者集合交给同一个门限 FHE 后端，生成唯一的一套完整公钥与私钥份额句柄；
+    3. 最终输出统一的 DistributedKeyGenerationResult，供阶段3/4/5 直接消费。
 
-    说明：
-    - 这是一个真实的多项式分发 + 指数承诺 + 份额验证过程；
-    - 由于当前项目的 FHE 还未替换为真实门限 FHE，本阶段的 public_key / decrypt_share_key
-      先作为后续 FHE 层的输入占位，但其生成过程本身已经具备真实数学基础；
-    - 当前先实现半诚实/同步模型，不处理投诉、重发和恶意广播回滚。
+    这样阶段2就同时承担：
+    - DKG 数学分片/承诺生成；
+    - 终版门限 FHE 密钥材料落地；
+    - 阶段4/5 解密份额来源固定为阶段2，而不是后续再次自建会话。
     """
 
     @staticmethod
@@ -88,6 +82,7 @@ class DistributedKeyGenerator:
             participant.participant_id: index + 1
             for index, participant in enumerate(participants)
         }
+        participant_ids = [participant.participant_id for participant in participants]
 
         polynomial_commitments: Dict[str, PolynomialCommitmentBroadcast] = {}
         private_share_deliveries: Dict[str, Dict[str, PrivateShareDelivery]] = {
@@ -116,7 +111,7 @@ class DistributedKeyGenerator:
                     share_value=share_value,
                 )
 
-        decrypt_key_shares: Dict[str, DecryptKeyShare] = {}
+        aggregated_shares: Dict[str, int] = {}
         share_public_keys: Dict[str, SharePublicKey] = {}
 
         for recipient in participants:
@@ -142,31 +137,47 @@ class DistributedKeyGenerator:
 
                 aggregated_share = (aggregated_share + delivery.share_value) % pp.q
 
-            decrypt_key_shares[recipient_id] = DecryptKeyShare(
-                participant_id=recipient_id,
-                decrypt_share_key=aggregated_share,
-            )
+            aggregated_shares[recipient_id] = aggregated_share
             share_public_keys[recipient_id] = SharePublicKey(
                 participant_id=recipient_id,
                 share_public_key=f"0x{pow(pp.g_prime, aggregated_share, pp.p):x}",
             )
 
-        public_key_value = 1
+        public_commitment_value = 1
         for sender in participants:
             sender_id = sender.participant_id
             constant_commitment = int(
                 polynomial_commitments[sender_id].coefficient_commitments[0],
                 16,
             )
-            public_key_value = (public_key_value * constant_commitment) % pp.p
+            public_commitment_value = (public_commitment_value * constant_commitment) % pp.p
+
+        generated_key_material = build_threshold_key_material(
+            participant_ids=participant_ids,
+            threshold=threshold,
+        )
+
+        threshold_fhe_private_key_shares: Dict[str, ThresholdFHEPrivateKeyShare] = {}
+        for participant_id in participant_ids:
+            threshold_fhe_private_key_shares[participant_id] = ThresholdFHEPrivateKeyShare(
+                participant_id=participant_id,
+                secret_share_scalar=aggregated_shares[participant_id],
+                fhe_private_key_share=generated_key_material.participant_private_share_handles[participant_id],
+                corresponding_share_public_key=share_public_keys[participant_id].share_public_key,
+                backend_name=generated_key_material.backend_name,
+                key_material_reference=generated_key_material.keyset_reference,
+            )
 
         return DistributedKeyGenerationResult(
-            public_key=f"0x{public_key_value:x}",
-            decrypt_key_shares=decrypt_key_shares,
+            public_key=generated_key_material.public_key,
+            threshold_fhe_private_key_shares=threshold_fhe_private_key_shares,
             share_public_keys=share_public_keys,
             polynomial_commitments=polynomial_commitments,
             private_share_deliveries=private_share_deliveries,
             threshold=threshold,
+            fhe_backend_name=generated_key_material.backend_name,
+            fhe_keyset_reference=generated_key_material.keyset_reference,
+            secret_commitment_public_key=f"0x{public_commitment_value:x}",
         )
 
 

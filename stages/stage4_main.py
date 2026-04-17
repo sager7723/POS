@@ -26,7 +26,7 @@ def main():
     # 只测阶段4
     start = time.perf_counter()
 
-    result = run_phase4_election(phase3.candidate_messages)
+    result = run_phase4_election(phase2, phase3.candidate_messages)
 
     end = time.perf_counter()
 

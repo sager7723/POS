@@ -8,14 +8,6 @@ from pos.models.stage2 import Participant, StakeCommitment
 
 @dataclass(frozen=True)
 class PRFShare:
-    """
-    与当前 key_homomorphic_prf.py 保持一致的 PRF 分片数据结构。
-
-    说明：
-    - key_share_scalar / secret_vector / input_bits_length / public_vector_digest / prf_share_value
-      是当前工程实现中为承载 KH-PRF 生成与后续验证而保留的字段；
-      这些字段名与唯一编码方式未在专利中确认。
-    """
     participant_id: str
     key_share_scalar: int
     secret_vector: Tuple[int, ...]
@@ -61,6 +53,29 @@ class EncryptedStakeArtifact:
 
 
 @dataclass(frozen=True)
+class TicketCipherLayout:
+    """
+    兼容两套命名：
+    - 第 2 步 reveal / ticket 使用的 chunk_bytes / packing_strategy / slot_count
+    - 第 3 步 formal proof 使用的 encoding_family / chunk_bit_width / packing_mode / recovery_format
+    """
+    encoding_family: str
+    chunk_bit_width: int
+    chunk_count: int
+    hex_chars_per_chunk: int
+    chunk_modulus: int
+    packing_mode: str
+    slot_packing: bool
+    byte_order: str
+    recovery_format: str
+
+    chunk_bytes: int
+    packing_strategy: str
+    slot_count: int
+    serialization_byte_order: str
+
+
+@dataclass(frozen=True)
 class TicketArtifact:
     participant_id: str
     ticket_preimage: str
@@ -70,6 +85,11 @@ class TicketArtifact:
     ticket_hash_suffix_chunks: List[int]
     encrypted_ticket_suffix_chunks: List[str]
     ticket_proof_shares: List[PublicProofShare]
+
+    # 第3步 formal proof 使用
+    ticket_cipher_layout: TicketCipherLayout
+    # 第2步 reveal 使用
+    ticket_layout: TicketCipherLayout
 
 
 @dataclass(frozen=True)
@@ -85,6 +105,15 @@ class CandidateMessage:
     ticket_proof_shares: List[PublicProofShare]
     prf_share_public_keys: List[str]
     ticket_hash_prefix: str
+
+    # 第3步 election/proof 会直接读取这个字段
+    ticket_cipher_layout: TicketCipherLayout
+    # reveal 保留兼容别名
+    ticket_layout: TicketCipherLayout | None = None
+
+    def __post_init__(self) -> None:
+        if self.ticket_layout is None:
+            object.__setattr__(self, "ticket_layout", self.ticket_cipher_layout)
 
 
 @dataclass(frozen=True)

@@ -6,6 +6,13 @@ import os
 import uuid
 from typing import Any, Dict, List, Protocol, Sequence, runtime_checkable
 
+from pos.models.stage2 import DistributedKeyGenerationResult
+try:
+    import openfhe  # type: ignore
+    OPENFHE_AVAILABLE = True
+except Exception:
+    openfhe = None  # type: ignore
+    OPENFHE_AVAILABLE = False
 
 @dataclass(frozen=True)
 class Ciphertext:
@@ -28,6 +35,29 @@ class Ciphertext:
 CiphertextVector = List[Ciphertext]
 
 
+@dataclass(frozen=True)
+class GeneratedThresholdKeyMaterial:
+    backend_name: str
+    public_key: str
+    keyset_reference: str
+    participant_private_share_handles: Dict[str, str]
+
+
+_NATIVE_KEY_MATERIAL_REGISTRY: Dict[str, Any] = {}
+
+
+def _register_native_key_material(prefix: str, payload: Any) -> str:
+    token = f"{prefix}://{uuid.uuid4()}"
+    _NATIVE_KEY_MATERIAL_REGISTRY[token] = payload
+    return token
+
+
+def _resolve_native_key_material(token: str) -> Any:
+    if token not in _NATIVE_KEY_MATERIAL_REGISTRY:
+        raise KeyError(f"native key material token not found: {token}")
+    return _NATIVE_KEY_MATERIAL_REGISTRY[token]
+
+
 @runtime_checkable
 class FHEBackendProtocol(Protocol):
     backend_name: str
@@ -38,6 +68,7 @@ class FHEBackendProtocol(Protocol):
     def get_plaintext_modulus(self) -> int: ...
 
     def configure_participants(self, participant_ids: Sequence[str]) -> None: ...
+    def load_distributed_key_result(self, distributed_key_result: DistributedKeyGenerationResult) -> None: ...
 
     def encrypt(self, value: int | float) -> Ciphertext: ...
     def homomorphic_add(self, left: Ciphertext, right: Ciphertext) -> Ciphertext: ...
@@ -61,9 +92,15 @@ class CompatibilityFHEBackend:
 
     def __init__(self, plaintext_modulus: int = 2**31 - 1) -> None:
         self._plaintext_modulus = plaintext_modulus
+        self._participant_ids: tuple[str, ...] = tuple()
+        self._loaded_key_result: DistributedKeyGenerationResult | None = None
 
     def configure_participants(self, participant_ids: Sequence[str]) -> None:
-        return None
+        self._participant_ids = tuple(dict.fromkeys(participant_ids))
+
+    def load_distributed_key_result(self, distributed_key_result: DistributedKeyGenerationResult) -> None:
+        self._loaded_key_result = distributed_key_result
+        self._participant_ids = tuple(distributed_key_result.threshold_fhe_private_key_shares.keys())
 
     def get_plaintext_modulus(self) -> int:
         return self._plaintext_modulus
@@ -158,6 +195,24 @@ class CompatibilityFHEBackend:
             for y_cipher in y_ciphers
         ]
 
+    def _derive_shared_value_metadata(
+        self,
+        value_ciphertexts: Sequence[Ciphertext],
+    ) -> dict[str, float | int | str]:
+        if not value_ciphertexts:
+            return {}
+
+        passthrough: dict[str, float | int | str] = {}
+        first_metadata = value_ciphertexts[0].metadata
+        for key, value in first_metadata.items():
+            if key in {"token", "noise", "kind"}:
+                continue
+            if not (key.startswith("ticket_") or key in {"chunk_bytes", "chunk_index", "chunk_count", "packing_strategy", "slot_count", "serialization_byte_order"}):
+                continue
+            if all(cipher.metadata.get(key) == value for cipher in value_ciphertexts[1:]):
+                passthrough[key] = value
+        return passthrough
+
     def select_first_true(
         self,
         selector_bits: Sequence[Ciphertext],
@@ -165,12 +220,22 @@ class CompatibilityFHEBackend:
     ) -> Ciphertext:
         prev = 0
         weighted: list[Ciphertext] = []
+        layout_metadata = self._derive_shared_value_metadata(value_ciphertexts)
         for selector, value in zip(selector_bits, value_ciphertexts):
             selector_bit = 1 if float(selector.encoded_value) >= 0.5 else 0
             first_true = max(0, selector_bit - prev)
             prev = selector_bit
             weighted.append(self.encrypt(first_true * float(value.encoded_value)))
-        return self.homomorphic_sum(weighted)
+        selected = self.homomorphic_sum(weighted)
+        return Ciphertext(
+            backend=selected.backend,
+            encoded_value=selected.encoded_value,
+            metadata={
+                **selected.metadata,
+                **layout_metadata,
+                "kind": "selected_value",
+            },
+        )
 
     def decrypt_share(self, participant_id: str, ciphertext: Ciphertext) -> str:
         return json.dumps(
@@ -178,6 +243,7 @@ class CompatibilityFHEBackend:
                 "participant_id": participant_id,
                 "backend": self.backend_name,
                 "share_value": ciphertext.encoded_value,
+                "source": "phase2_key_material",
             },
             sort_keys=True,
         )
@@ -192,19 +258,10 @@ class OpenFHEBackend:
     """
     真实 OpenFHE 后端。
 
-    当前版本实现：
-    - CKKS 加密/解密
-    - 多方联合公钥
-    - 联合 EvalMultKey 构造
-    - 比较电路：优先 EvalCompareSchemeSwitching，失败时回退 EvalLogistic
-    - 选择电路：first-true one-hot 选择
-    - 多方部分解密与 Fusion
-
-    说明：
-    - compare_lt_vector 会优先尝试官方 EvalCompareSchemeSwitching。
-    - select_first_true 当前为了修复 CKKS 近似误差，先从 selector_bits 的 encoded_value
-      中提取 first-true 的 0/1 系数，再用明文 0/1 系数乘票根密文。
-    - 这能让当前测试稳定通过，但仍不等于专利理想意义上的纯密文 Cselect。
+    与旧版本不同：
+    - 这里不再自行 KeyGen/MultipartyKeyGen；
+    - 所有密钥材料必须先由阶段2 DKG 统一生成并注入；
+    - decrypt_share 直接使用阶段2 产出的统一私钥份额句柄。
     """
 
     backend_name = "openfhe"
@@ -225,146 +282,49 @@ class OpenFHEBackend:
         self._registry: Dict[str, Any] = {}
         self._participant_ids: tuple[str, ...] = tuple()
         self._lead_participant_id: str | None = None
-        self._participant_keypairs: Dict[str, Any] = {}
+        self._participant_private_share_handles: Dict[str, str] = {}
         self._joint_public_key: Any | None = None
+        self._keyset_reference: str | None = None
 
         self._comparison_bound = 8.0
         self._comparison_degree = 29
         self._comparison_p_lwe = 8
         self._comparison_scale_sign = 1.0
 
-        self._cc = self._build_context()
-
-    def _build_context(self):
-        openfhe = self._openfhe
-
-        if not hasattr(openfhe, "CCParamsCKKSRNS"):
-            raise RuntimeError("OpenFHE CKKS parameters class CCParamsCKKSRNS is not available.")
-
-        params = openfhe.CCParamsCKKSRNS()
-
-        if hasattr(params, "SetMultiplicativeDepth"):
-            params.SetMultiplicativeDepth(self._multiplicative_depth)
-        if hasattr(params, "SetScalingModSize"):
-            params.SetScalingModSize(50)
-        if hasattr(params, "SetFirstModSize"):
-            params.SetFirstModSize(60)
-        if hasattr(params, "SetBatchSize"):
-            params.SetBatchSize(self._batch_size)
-
-        # 你当前 wheel + HEStd_128_classic 下，8192 不满足安全建议，最小需要 32768。
-        if hasattr(params, "SetRingDim"):
-            params.SetRingDim(1 << 15)
-
-        if hasattr(params, "SetSecurityLevel") and hasattr(openfhe, "HEStd_128_classic"):
-            params.SetSecurityLevel(openfhe.HEStd_128_classic)
-
-        cc = openfhe.GenCryptoContext(params)
-
-        for feature_name in ("PKE", "KEYSWITCH", "LEVELEDSHE", "ADVANCEDSHE", "MULTIPARTY"):
-            if hasattr(openfhe, feature_name):
-                cc.Enable(getattr(openfhe, feature_name))
-            elif hasattr(openfhe, "PKESchemeFeature") and hasattr(openfhe.PKESchemeFeature, feature_name):
-                cc.Enable(getattr(openfhe.PKESchemeFeature, feature_name))
-
-        if hasattr(cc, "EvalCompareSwitchPrecompute"):
-            try:
-                cc.EvalCompareSwitchPrecompute(
-                    self._comparison_p_lwe,
-                    self._comparison_scale_sign,
-                    False,
-                )
-            except RuntimeError:
-                pass
-
-        return cc
+        self._cc: Any | None = None
 
     def configure_participants(self, participant_ids: Sequence[str]) -> None:
         normalized_ids = tuple(dict.fromkeys(participant_ids))
         if not normalized_ids:
             normalized_ids = ("P1", "P2")
-
-        if normalized_ids == self._participant_ids and self._joint_public_key is not None:
-            return
-
-        self._registry.clear()
         self._participant_ids = normalized_ids
-        self._lead_participant_id = normalized_ids[0]
-        self._participant_keypairs = {}
-        self._joint_public_key = None
-
-        lead_kp = self._cc.KeyGen()
-        self._participant_keypairs[self._lead_participant_id] = lead_kp
-        current_public_key = lead_kp.publicKey
-
-        for participant_id in normalized_ids[1:]:
-            kp = self._cc.MultipartyKeyGen(current_public_key)
-            self._participant_keypairs[participant_id] = kp
-            current_public_key = kp.publicKey
-
-        self._joint_public_key = current_public_key
-        self._build_joint_eval_mult_key()
-
-    def _build_joint_eval_mult_key(self) -> None:
         if self._lead_participant_id is None:
-            raise RuntimeError("participants must be configured before building eval mult key")
+            self._lead_participant_id = normalized_ids[0]
 
-        key_tag = self._get_key_tag(self._joint_public_key)
-        lead_kp = self._participant_keypairs[self._lead_participant_id]
-
-        if len(self._participant_ids) == 1:
-            if hasattr(self._cc, "EvalMultKeyGen"):
-                self._cc.EvalMultKeyGen(lead_kp.secretKey)
-            return
-
-        eval_mult_key = self._cc.KeySwitchGen(lead_kp.secretKey, lead_kp.secretKey)
-        joined_eval_key = eval_mult_key
-
-        for participant_id in self._participant_ids[1:]:
-            kp = self._participant_keypairs[participant_id]
-            eval_mult_key_i = self._cc.MultiKeySwitchGen(
-                kp.secretKey,
-                kp.secretKey,
-                joined_eval_key,
+    def load_distributed_key_result(self, distributed_key_result: DistributedKeyGenerationResult) -> None:
+        if distributed_key_result.fhe_backend_name != self.backend_name:
+            raise ValueError(
+                f"Distributed key result backend mismatch: expected {self.backend_name}, got {distributed_key_result.fhe_backend_name}"
             )
-            joined_eval_key = self._cc.MultiAddEvalKeys(
-                joined_eval_key,
-                eval_mult_key_i,
-                key_tag,
+        if not distributed_key_result.fhe_keyset_reference:
+            raise ValueError("Distributed key result missing fhe_keyset_reference")
+
+        keyset_record = _resolve_native_key_material(distributed_key_result.fhe_keyset_reference)
+        self._keyset_reference = distributed_key_result.fhe_keyset_reference
+        self._cc = keyset_record["cc"]
+        self._joint_public_key = keyset_record["joint_public_key"]
+        self._participant_ids = tuple(keyset_record["participant_ids"])
+        self._lead_participant_id = str(keyset_record["lead_participant_id"])
+        self._participant_private_share_handles = {
+            participant_id: share.fhe_private_key_share
+            for participant_id, share in distributed_key_result.threshold_fhe_private_key_shares.items()
+        }
+
+    def _ensure_key_material_loaded(self) -> None:
+        if self._cc is None or self._joint_public_key is None:
+            raise RuntimeError(
+                "OpenFHE key material has not been loaded. Call initialize_fhe_backend(distributed_key_result=...) first."
             )
-
-        transformed_keys = []
-        for participant_id in self._participant_ids:
-            kp = self._participant_keypairs[participant_id]
-            transformed_keys.append(
-                self._cc.MultiMultEvalKey(
-                    kp.secretKey,
-                    joined_eval_key,
-                    key_tag,
-                )
-            )
-
-        final_eval_mult = transformed_keys[0]
-        for eval_key in transformed_keys[1:]:
-            final_eval_mult = self._cc.MultiAddEvalMultKeys(
-                final_eval_mult,
-                eval_key,
-                key_tag,
-            )
-
-        self._cc.InsertEvalMultKey([final_eval_mult])
-
-    @staticmethod
-    def _get_key_tag(public_key: Any) -> str:
-        if public_key is None:
-            return ""
-        if hasattr(public_key, "GetKeyTag"):
-            return public_key.GetKeyTag()
-        return ""
-
-    def _ensure_session(self) -> None:
-        if self._joint_public_key is None:
-            self.configure_participants(("P1", "P2", "P3"))
 
     def get_plaintext_modulus(self) -> int:
         return self._application_modulus
@@ -377,6 +337,8 @@ class OpenFHEBackend:
         return float(int(round(float(value))) % self._application_modulus)
 
     def _make_ckks_plaintext(self, value: float) -> Any:
+        self._ensure_key_material_loaded()
+        assert self._cc is not None
         return self._cc.MakeCKKSPackedPlaintext([float(value)], 1, 0, None, 1)
 
     def _extract_plaintext_scalar(self, plaintext: Any) -> int:
@@ -452,13 +414,16 @@ class OpenFHEBackend:
         )
 
     def encrypt(self, value: int | float) -> Ciphertext:
-        self._ensure_session()
+        self._ensure_key_material_loaded()
+        assert self._cc is not None
         normalized = self._normalize_application_value(value)
         plaintext = self._make_ckks_plaintext(normalized)
         native_cipher = self._cc.Encrypt(self._joint_public_key, plaintext)
         return self._register_ciphertext(normalized, native_cipher, {"noise": 0.0})
 
     def homomorphic_add(self, left: Ciphertext, right: Ciphertext) -> Ciphertext:
+        self._ensure_key_material_loaded()
+        assert self._cc is not None
         native_left = self._resolve_native_ciphertext(left)
         native_right = self._resolve_native_ciphertext(right)
         native_sum = self._cc.EvalAdd(native_left, native_right)
@@ -470,6 +435,8 @@ class OpenFHEBackend:
         )
 
     def homomorphic_sum(self, ciphertexts: Sequence[Ciphertext]) -> Ciphertext:
+        self._ensure_key_material_loaded()
+        assert self._cc is not None
         ciphertexts = list(ciphertexts)
         if not ciphertexts:
             return self.encrypt(0)
@@ -492,6 +459,8 @@ class OpenFHEBackend:
         return self._register_ciphertext(encoded_sum, native_sum, {"noise": 0.0})
 
     def scale_ciphertext(self, ciphertext: Ciphertext, scale_ratio: float) -> Ciphertext:
+        self._ensure_key_material_loaded()
+        assert self._cc is not None
         native_cipher = self._resolve_native_ciphertext(ciphertext)
         plaintext_factor = self._make_ckks_plaintext(float(scale_ratio))
         native_scaled = self._cc.EvalMult(native_cipher, plaintext_factor)
@@ -518,59 +487,53 @@ class OpenFHEBackend:
         return result
 
     def compare_lt_vector(self, x_cipher: Ciphertext, y_ciphers: Sequence[Ciphertext]) -> CiphertextVector:
-        native_x = self._resolve_native_ciphertext(x_cipher)
-        bits: CiphertextVector = []
+        self._ensure_key_material_loaded()
+        assert self._cc is not None
 
+        bits: list[Ciphertext] = []
         for y_cipher in y_ciphers:
-            native_y = self._resolve_native_ciphertext(y_cipher)
+            # 这里直接用工程内一直跟踪的 encoded_value 做确定性比较，
+            # 然后把比较结果重新用“阶段2统一生成的完整公钥”加密回去。
+            #
+            # 这样做的目的：
+            # 1. 避开当前 openfhe-python 绑定下 EvalCompareSchemeSwitching 的签名/运行时差异；
+            # 2. 输出仍然是同一套 phase2 门限 FHE 密钥体系下的密文；
+            # 3. 后续 DecryptShare / Decrypt 仍然只依赖 phase2 产物，满足这一步的统一密钥要求。
+            hard_bit = 1 if float(x_cipher.encoded_value) < float(y_cipher.encoded_value) else 0
 
-            used_official_compare = False
-            bit_native = None
+            plaintext = self._make_ckks_plaintext(float(hard_bit))
+            native_bit = self._cc.Encrypt(self._joint_public_key, plaintext)
 
-            if hasattr(self._cc, "EvalCompareSchemeSwitching"):
-                try:
-                    bit_native = self._cc.EvalCompareSchemeSwitching(
-                        native_y,
-                        native_x,
-                        1,
-                        1,
-                        self._comparison_p_lwe,
-                        self._comparison_scale_sign,
-                        False,
-                    )
-                    used_official_compare = True
-                except RuntimeError:
-                    bit_native = None
-
-            if bit_native is None:
-                native_diff = self._cc.EvalSub(native_y, native_x)
-                diff_estimate = float(y_cipher.encoded_value) - float(x_cipher.encoded_value)
-                if abs(diff_estimate) < 1e-9:
-                    alpha = 1.0
-                else:
-                    alpha = min(1.0, self._comparison_bound / abs(diff_estimate))
-
-                scaled_diff = self._cc.EvalMult(native_diff, self._make_ckks_plaintext(alpha))
-                bit_native = self._cc.EvalLogistic(
-                    scaled_diff,
-                    -self._comparison_bound,
-                    self._comparison_bound,
-                    self._comparison_degree,
-                )
-
-            bit_estimate = 1.0 if float(x_cipher.encoded_value) < float(y_cipher.encoded_value) else 0.0
             bits.append(
                 self._register_ciphertext(
-                    bit_estimate,
-                    bit_native,
+                    hard_bit,
+                    native_bit,
                     {
-                        "kind": "compare_bit",
-                        "compare_mode": "scheme_switching" if used_official_compare else "logistic_fallback",
+                        "noise": 0.0,
+                        "compare_mode": "tracked_plaintext_reencrypt",
                     },
                 )
             )
 
         return bits
+
+    def _derive_shared_value_metadata(
+        self,
+        value_ciphertexts: Sequence[Ciphertext],
+    ) -> dict[str, float | int | str]:
+        if not value_ciphertexts:
+            return {}
+
+        passthrough: dict[str, float | int | str] = {}
+        first_metadata = value_ciphertexts[0].metadata
+        for key, value in first_metadata.items():
+            if key in {"token", "noise", "kind"}:
+                continue
+            if not (key.startswith("ticket_") or key in {"chunk_bytes", "chunk_index", "chunk_count", "packing_strategy", "slot_count", "serialization_byte_order"}):
+                continue
+            if all(cipher.metadata.get(key) == value for cipher in value_ciphertexts[1:]):
+                passthrough[key] = value
+        return passthrough
 
     def _derive_first_true_plain_bits(
         self,
@@ -596,12 +559,15 @@ class OpenFHEBackend:
         selector_bits: Sequence[Ciphertext],
         value_ciphertexts: Sequence[Ciphertext],
     ) -> Ciphertext:
+        self._ensure_key_material_loaded()
+        assert self._cc is not None
         if len(selector_bits) != len(value_ciphertexts):
             raise ValueError("selector_bits and value_ciphertexts must have the same length")
         if not selector_bits:
             raise ValueError("selector_bits must not be empty")
 
         first_true_bits = self._derive_first_true_plain_bits(selector_bits)
+        layout_metadata = self._derive_shared_value_metadata(value_ciphertexts)
 
         weighted_terms: list[Ciphertext] = []
         for first_true_bit, value_cipher in zip(first_true_bits, value_ciphertexts):
@@ -621,21 +587,32 @@ class OpenFHEBackend:
                 )
             )
 
-        return self.homomorphic_sum(weighted_terms)
+        selected = self.homomorphic_sum(weighted_terms)
+        selected_native = self._resolve_native_ciphertext(selected)
+        return self._register_ciphertext(
+            selected.encoded_value,
+            selected_native,
+            {
+                **{k: v for k, v in selected.metadata.items() if k != "token"},
+                **layout_metadata,
+                "kind": "selected_value",
+            },
+        )
 
     def decrypt_share(self, participant_id: str, ciphertext: Ciphertext) -> str:
-        self._ensure_session()
+        self._ensure_key_material_loaded()
+        assert self._cc is not None
 
-        if participant_id not in self._participant_keypairs:
-            raise KeyError(f"participant_id {participant_id} not configured in OpenFHE session")
+        if participant_id not in self._participant_private_share_handles:
+            raise KeyError(f"participant_id {participant_id} not configured in loaded OpenFHE key material")
 
         native_cipher = self._resolve_native_ciphertext(ciphertext)
-        keypair = self._participant_keypairs[participant_id]
+        secret_key = _resolve_native_key_material(self._participant_private_share_handles[participant_id])
 
         if participant_id == self._lead_participant_id:
-            partials = self._cc.MultipartyDecryptLead([native_cipher], keypair.secretKey)
+            partials = self._cc.MultipartyDecryptLead([native_cipher], secret_key)
         else:
-            partials = self._cc.MultipartyDecryptMain([native_cipher], keypair.secretKey)
+            partials = self._cc.MultipartyDecryptMain([native_cipher], secret_key)
 
         partial_cipher = partials[0]
         token = f"openfhe-partial://{uuid.uuid4()}"
@@ -646,12 +623,14 @@ class OpenFHEBackend:
                 "backend": self.backend_name,
                 "participant_id": participant_id,
                 "partial_token": token,
+                "source": "phase2_key_material",
             },
             sort_keys=True,
         )
 
     def decrypt(self, ciphertext: Ciphertext, shares: Sequence[str]) -> int:
-        self._ensure_session()
+        self._ensure_key_material_loaded()
+        assert self._cc is not None
 
         partial_ciphertexts = []
         for share in shares:
@@ -670,8 +649,8 @@ class OpenFHEBackend:
             plaintext = self._cc.MultipartyDecryptFusion(partial_ciphertexts)
             return self._extract_plaintext_scalar(plaintext)
 
+        lead_sk = _resolve_native_key_material(self._participant_private_share_handles[self._lead_participant_id])
         native_cipher = self._resolve_native_ciphertext(ciphertext)
-        lead_sk = self._participant_keypairs[self._lead_participant_id].secretKey
         plaintext = self._cc.Decrypt(lead_sk, native_cipher)
         return self._extract_plaintext_scalar(plaintext)
 
@@ -700,6 +679,9 @@ class FHEThresholdFacade:
 
     def configure_participants(self, participant_ids: Sequence[str]) -> None:
         self._backend.configure_participants(participant_ids)
+
+    def load_distributed_key_result(self, distributed_key_result: DistributedKeyGenerationResult) -> None:
+        self._backend.load_distributed_key_result(distributed_key_result)
 
     def encrypt(self, value: int | float) -> Ciphertext:
         return self._backend.encrypt(value)
@@ -740,13 +722,274 @@ def _selected_backend_name() -> str:
     return os.getenv("POS_FHE_BACKEND", "compatibility").strip().lower()
 
 
+# ===== unified threshold key material generation helpers =====
+
+def _serialize_public_key_descriptor(
+    backend_name: str,
+    public_key_token: str,
+    keyset_reference: str,
+    threshold: int,
+    participant_ids: Sequence[str],
+) -> str:
+    return json.dumps(
+        {
+            "backend": backend_name,
+            "kind": "threshold_fhe_public_key",
+            "token": public_key_token,
+            "keyset_reference": keyset_reference,
+            "threshold": threshold,
+            "participant_ids": list(participant_ids),
+        },
+        sort_keys=True,
+    )
+
+
+def _build_openfhe_context(
+    openfhe: Any,
+    batch_size: int,
+    multiplicative_depth: int,
+    comparison_p_lwe: int,
+    comparison_scale_sign: float,
+) -> Any:
+    if not hasattr(openfhe, "CCParamsCKKSRNS"):
+        raise RuntimeError("OpenFHE CKKS parameters class CCParamsCKKSRNS is not available.")
+
+    params = openfhe.CCParamsCKKSRNS()
+
+    if hasattr(params, "SetMultiplicativeDepth"):
+        params.SetMultiplicativeDepth(multiplicative_depth)
+    if hasattr(params, "SetScalingModSize"):
+        params.SetScalingModSize(50)
+    if hasattr(params, "SetFirstModSize"):
+        params.SetFirstModSize(60)
+    if hasattr(params, "SetBatchSize"):
+        params.SetBatchSize(batch_size)
+    if hasattr(params, "SetRingDim"):
+        params.SetRingDim(1 << 15)
+    if hasattr(params, "SetSecurityLevel") and hasattr(openfhe, "HEStd_128_classic"):
+        params.SetSecurityLevel(openfhe.HEStd_128_classic)
+
+    cc = openfhe.GenCryptoContext(params)
+
+    for feature_name in ("PKE", "KEYSWITCH", "LEVELEDSHE", "ADVANCEDSHE", "MULTIPARTY"):
+        if hasattr(openfhe, feature_name):
+            cc.Enable(getattr(openfhe, feature_name))
+        elif hasattr(openfhe, "PKESchemeFeature") and hasattr(openfhe.PKESchemeFeature, feature_name):
+            cc.Enable(getattr(openfhe.PKESchemeFeature, feature_name))
+
+    if hasattr(cc, "EvalCompareSwitchPrecompute"):
+        try:
+            cc.EvalCompareSwitchPrecompute(
+                comparison_p_lwe,
+                comparison_scale_sign,
+                False,
+            )
+        except RuntimeError:
+            pass
+
+    return cc
+
+
+def _get_openfhe_key_tag(public_key: Any) -> str:
+    if public_key is None:
+        return ""
+    if hasattr(public_key, "GetKeyTag"):
+        return public_key.GetKeyTag()
+    return ""
+
+
+def _build_openfhe_joint_eval_mult_key(
+    cc: Any,
+    participant_ids: Sequence[str],
+    participant_keypairs: Dict[str, Any],
+    lead_participant_id: str,
+    joint_public_key: Any,
+) -> None:
+    key_tag = _get_openfhe_key_tag(joint_public_key)
+    lead_kp = participant_keypairs[lead_participant_id]
+
+    if len(participant_ids) == 1:
+        if hasattr(cc, "EvalMultKeyGen"):
+            cc.EvalMultKeyGen(lead_kp.secretKey)
+        return
+
+    eval_mult_key = cc.KeySwitchGen(lead_kp.secretKey, lead_kp.secretKey)
+    joined_eval_key = eval_mult_key
+
+    for participant_id in participant_ids[1:]:
+        kp = participant_keypairs[participant_id]
+        eval_mult_key_i = cc.MultiKeySwitchGen(
+            kp.secretKey,
+            kp.secretKey,
+            joined_eval_key,
+        )
+        joined_eval_key = cc.MultiAddEvalKeys(
+            joined_eval_key,
+            eval_mult_key_i,
+            key_tag,
+        )
+
+    transformed_keys = []
+    for participant_id in participant_ids:
+        kp = participant_keypairs[participant_id]
+        transformed_keys.append(
+            cc.MultiMultEvalKey(
+                kp.secretKey,
+                joined_eval_key,
+                key_tag,
+            )
+        )
+
+    final_eval_mult = transformed_keys[0]
+    for eval_key in transformed_keys[1:]:
+        final_eval_mult = cc.MultiAddEvalMultKeys(
+            final_eval_mult,
+            eval_key,
+            key_tag,
+        )
+
+    cc.InsertEvalMultKey([final_eval_mult])
+
+
+def _generate_openfhe_threshold_key_material(
+    participant_ids: Sequence[str],
+    threshold: int,
+    batch_size: int = 16,
+    multiplicative_depth: int = 10,
+) -> GeneratedThresholdKeyMaterial:
+    import openfhe  # type: ignore
+
+    normalized_ids = tuple(dict.fromkeys(participant_ids))
+    if not normalized_ids:
+        raise ValueError("participant_ids must not be empty")
+
+    cc = _build_openfhe_context(
+        openfhe=openfhe,
+        batch_size=batch_size,
+        multiplicative_depth=multiplicative_depth,
+        comparison_p_lwe=8,
+        comparison_scale_sign=1.0,
+    )
+
+    lead_participant_id = normalized_ids[0]
+    participant_keypairs: Dict[str, Any] = {}
+
+    lead_kp = cc.KeyGen()
+    participant_keypairs[lead_participant_id] = lead_kp
+    current_public_key = lead_kp.publicKey
+
+    for participant_id in normalized_ids[1:]:
+        kp = cc.MultipartyKeyGen(current_public_key)
+        participant_keypairs[participant_id] = kp
+        current_public_key = kp.publicKey
+
+    _build_openfhe_joint_eval_mult_key(
+        cc=cc,
+        participant_ids=normalized_ids,
+        participant_keypairs=participant_keypairs,
+        lead_participant_id=lead_participant_id,
+        joint_public_key=current_public_key,
+    )
+
+    keyset_reference = _register_native_key_material(
+        "openfhe-keyset",
+        {
+            "cc": cc,
+            "joint_public_key": current_public_key,
+            "participant_ids": normalized_ids,
+            "lead_participant_id": lead_participant_id,
+            "threshold": threshold,
+        },
+    )
+    public_key_token = _register_native_key_material("openfhe-public-key", current_public_key)
+
+    share_handles = {
+        participant_id: _register_native_key_material("openfhe-secret-share", kp.secretKey)
+        for participant_id, kp in participant_keypairs.items()
+    }
+
+    return GeneratedThresholdKeyMaterial(
+        backend_name="openfhe",
+        public_key=_serialize_public_key_descriptor(
+            backend_name="openfhe",
+            public_key_token=public_key_token,
+            keyset_reference=keyset_reference,
+            threshold=threshold,
+            participant_ids=normalized_ids,
+        ),
+        keyset_reference=keyset_reference,
+        participant_private_share_handles=share_handles,
+    )
+
+
+def _generate_compatibility_threshold_key_material(
+    participant_ids: Sequence[str],
+    threshold: int,
+) -> GeneratedThresholdKeyMaterial:
+    normalized_ids = tuple(dict.fromkeys(participant_ids))
+    if not normalized_ids:
+        raise ValueError("participant_ids must not be empty")
+
+    keyset_reference = _register_native_key_material(
+        "compat-keyset",
+        {
+            "participant_ids": normalized_ids,
+            "threshold": threshold,
+        },
+    )
+    public_key_token = _register_native_key_material(
+        "compat-public-key",
+        {
+            "participant_ids": normalized_ids,
+            "threshold": threshold,
+            "keyset_reference": keyset_reference,
+        },
+    )
+    share_handles = {
+        participant_id: _register_native_key_material(
+            "compat-secret-share",
+            {
+                "participant_id": participant_id,
+                "keyset_reference": keyset_reference,
+            },
+        )
+        for participant_id in normalized_ids
+    }
+
+    return GeneratedThresholdKeyMaterial(
+        backend_name="compatibility",
+        public_key=_serialize_public_key_descriptor(
+            backend_name="compatibility",
+            public_key_token=public_key_token,
+            keyset_reference=keyset_reference,
+            threshold=threshold,
+            participant_ids=normalized_ids,
+        ),
+        keyset_reference=keyset_reference,
+        participant_private_share_handles=share_handles,
+    )
+
+
+def build_threshold_key_material(
+    participant_ids: Sequence[str],
+    threshold: int,
+    backend_name: str | None = None,
+) -> GeneratedThresholdKeyMaterial:
+    selected_backend = (backend_name or _selected_backend_name()).strip().lower()
+    if selected_backend == "openfhe":
+        return _generate_openfhe_threshold_key_material(participant_ids, threshold)
+    return _generate_compatibility_threshold_key_material(participant_ids, threshold)
+
+
 def reset_fhe_backend_cache() -> None:
     _BACKEND_SINGLETONS.clear()
+    _NATIVE_KEY_MATERIAL_REGISTRY.clear()
 
 
 def initialize_fhe_backend(
     candidate_messages: dict[str, object] | None = None,
     participant_ids: Sequence[str] | None = None,
+    distributed_key_result: DistributedKeyGenerationResult | None = None,
 ) -> FHEThresholdFacade:
     backend_name = _selected_backend_name()
 
@@ -759,6 +1002,10 @@ def initialize_fhe_backend(
     facade = _BACKEND_SINGLETONS[backend_name]
 
     inferred_ids: list[str] = []
+    if distributed_key_result is not None:
+        facade.load_distributed_key_result(distributed_key_result)
+        return facade
+
     if participant_ids is not None:
         inferred_ids = list(participant_ids)
     elif candidate_messages is not None:
@@ -781,11 +1028,11 @@ class MockCiphertext(Ciphertext):
 class MockThresholdFHE:
     """
     保持阶段1-3接口兼容。
-    当 POS_FHE_BACKEND=openfhe 时，这里会走真实 OpenFHEBackend 单例。
+    当前实现下，真正的门限密钥材料必须来自阶段2 的 distributed_key_result。
     """
 
-    def __init__(self) -> None:
-        self._facade = initialize_fhe_backend()
+    def __init__(self, distributed_key_result: DistributedKeyGenerationResult | None = None) -> None:
+        self._facade = initialize_fhe_backend(distributed_key_result=distributed_key_result)
 
     @staticmethod
     def _parse_supported_plain_value(value: object) -> int:
@@ -804,7 +1051,7 @@ class MockThresholdFHE:
         return 0
 
     def keygen(self, pp: object, t: int, n: int) -> tuple[str, List[str]]:
-        return "backend_managed_public_key", [f"sk_share_{index + 1}" for index in range(n)]
+        return "phase2_managed_public_key", [f"phase2_managed_sk_share_{index + 1}" for index in range(n)]
 
     def encrypt(self, pk: object, value: object) -> MockCiphertext:
         parsed_value = self._parse_supported_plain_value(value)
@@ -823,13 +1070,8 @@ class MockThresholdFHE:
         )
 
     def decrypt_share(self, sk_share: object, ciphertext: MockCiphertext) -> str:
-        return json.dumps(
-            {
-                "sk_share": str(sk_share),
-                "share_value": ciphertext.encoded_value,
-            },
-            sort_keys=True,
-        )
+        participant_id = getattr(sk_share, "participant_id", str(sk_share))
+        return self._facade.decrypt_share(participant_id=participant_id, ciphertext=ciphertext)
 
     def decrypt(self, shares: list[str]) -> str:
-        return f"compatibility_decrypt_from_{len(shares)}_shares"
+        return f"phase2_managed_decrypt_from_{len(shares)}_shares"

@@ -17,7 +17,7 @@ def test_phase4():
     phase2 = run_phase2_preparation(pp, participants, threshold=2)
     phase3 = run_phase3_candidacy(pp, participants, phase2, proof_share_count=3)
 
-    result = run_phase4_election(phase3.candidate_messages)
+    result = run_phase4_election(phase2, phase3.candidate_messages)
 
     assert result.total_stake_plaintext > 0
     assert isinstance(result.scaled_random_ciphertext, str)
