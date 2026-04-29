@@ -3,11 +3,16 @@ from __future__ import annotations
 import json
 import secrets
 from dataclasses import replace
-from typing import Dict, List, Sequence
+from typing import Dict, List
 
-from pos.crypto.fhe import MockThresholdFHE, initialize_fhe_backend
+from pos.crypto.fhe import FHEThresholdFacade, initialize_fhe_backend
+from pos.crypto.patent_widths import (
+    lottery_data_type,
+    lottery_modulus,
+    strict_kms_patent_mode_enabled,
+)
 from pos.crypto.key_homomorphic_prf import MockKeyHomomorphicPRF
-from pos.crypto.proofs import MockProofShareGenerator
+from pos.crypto.proofs import PatentProofShareGenerator
 from pos.crypto.ticket import MockTicketBuilder
 from pos.crypto.setup import step0_setup
 from pos.models.common import PublicParameters
@@ -23,7 +28,36 @@ from pos.models.stage3 import (
 )
 
 
-def _sample_proof_randomizer(proof_generator: MockProofShareGenerator) -> int:
+
+def _ciphertext_wire_payload(ciphertext: object) -> str:
+    if isinstance(ciphertext, str):
+        return ciphertext
+
+    payload = getattr(ciphertext, "payload", None)
+    if isinstance(payload, str):
+        return payload
+
+    if hasattr(ciphertext, "to_json"):
+        return ciphertext.to_json()  # type: ignore[no-any-return]
+
+    return str(ciphertext)
+
+
+def _encrypt_scalar_wire_payload(fhe: FHEThresholdFacade, value: int) -> str:
+    if strict_kms_patent_mode_enabled():
+        return _ciphertext_wire_payload(
+            fhe.encrypt_scalar(
+                int(value),
+                data_type=lottery_data_type(),
+                no_compression=True,
+                no_precompute_sns=True,
+            )
+        )
+
+    return _ciphertext_wire_payload(fhe.encrypt_scalar(value))
+
+
+def _sample_proof_randomizer(proof_generator: PatentProofShareGenerator) -> int:
     return secrets.randbelow(proof_generator.params.field_prime)
 
 
@@ -44,17 +78,24 @@ def _sorted_phase2_share_public_keys(
     ]
 
 
+def _parse_supported_plain_value(value: object) -> int:
+    if isinstance(value, (int, float)):
+        return int(round(float(value)))
+    if isinstance(value, str) and value.startswith("prf_share:0x"):
+        return int(value.split(":0x", 1)[1], 16)
+    if isinstance(value, str) and value.startswith("stake(") and value.endswith(")"):
+        return int(value[6:-1])
+    if isinstance(value, str) and value.startswith("ticket_hash_suffix(") and value.endswith(")"):
+        return int(value[len("ticket_hash_suffix("):-1], 16)
+    raise ValueError(f"unsupported plaintext value: {value!r}")
+
+
 def step4_generate_prf_shares(
     pp: PublicParameters,
     participants: List[Participant],
     random_seed: str,
     key_shares: Dict[str, int],
 ) -> Dict[str, PRFShare]:
-    """
-    专利约束相关：
-    - PRF 分片必须绑定阶段2产生的密钥份额；
-    - 不能脱离前一阶段门限密钥材料单独生成。
-    """
     prf = MockKeyHomomorphicPRF()
     return {
         participant.participant_id: prf.generate_prf_share(
@@ -76,17 +117,24 @@ def step5_encrypt_prf_shares_and_generate_proof_shares(
 ) -> Dict[str, EncryptedPRFShareArtifact]:
     if pp is None:
         pp = step0_setup(128)
-    fhe = MockThresholdFHE(distributed_key_result=distributed_key_result)
-    proof_generator = MockProofShareGenerator()
-    plaintext_modulus = fhe._facade.get_plaintext_modulus()
+    fhe: FHEThresholdFacade = initialize_fhe_backend(distributed_key_result=distributed_key_result)
+    proof_generator = PatentProofShareGenerator()
+    plaintext_modulus = (lottery_modulus() if strict_kms_patent_mode_enabled() else fhe.get_plaintext_modulus())
 
     declared_share_public_key_set = _sorted_phase2_share_public_keys(distributed_key_result)
     artifacts: Dict[str, EncryptedPRFShareArtifact] = {}
     for participant_id, prf_share in prf_shares.items():
-        encrypted_prf_share = fhe.encrypt(
-            pk=public_key,
-            value=prf_share.prf_share,
-        ).payload
+        prf_share_plain_value = _parse_supported_plain_value(prf_share.prf_share)
+
+        # Patent strict KMS path represents the KH-PRF share in the election
+        # arithmetic plaintext ring. This ring is controlled by
+        # POS_LOTTERY_WORD_BITS, not by the ticket chunk width.
+        # Step16 homomorphically sums these PRF-share ciphertexts, and Step17
+        # scales the resulting complete PRF ciphertext.
+        if strict_kms_patent_mode_enabled():
+            prf_share_plain_value = prf_share_plain_value % lottery_modulus()
+
+        encrypted_prf_share = _encrypt_scalar_wire_payload(fhe, prf_share_plain_value)
         ciphertext_noise = _extract_public_noise(encrypted_prf_share)
 
         declared_share_public_key = (
@@ -132,17 +180,14 @@ def step6_encrypt_stakes_and_generate_proof_shares(
 ) -> Dict[str, EncryptedStakeArtifact]:
     if pp is None:
         pp = step0_setup(128)
-    fhe = MockThresholdFHE(distributed_key_result=distributed_key_result)
-    proof_generator = MockProofShareGenerator()
-    plaintext_modulus = fhe._facade.get_plaintext_modulus()
+    fhe: FHEThresholdFacade = initialize_fhe_backend(distributed_key_result=distributed_key_result)
+    proof_generator = PatentProofShareGenerator()
+    plaintext_modulus = (lottery_modulus() if strict_kms_patent_mode_enabled() else fhe.get_plaintext_modulus())
 
     artifacts: Dict[str, EncryptedStakeArtifact] = {}
     for participant in participants:
         participant_id = participant.participant_id
-        encrypted_stake = fhe.encrypt(
-            pk=public_key,
-            value=f"stake({participant.stake_value})",
-        ).payload
+        encrypted_stake = _encrypt_scalar_wire_payload(fhe, participant.stake_value)
         ciphertext_noise = _extract_public_noise(encrypted_stake)
         encryption_randomizer = _sample_proof_randomizer(proof_generator)
         noise_bound = max(ciphertext_noise, 0)
@@ -158,9 +203,7 @@ def step6_encrypt_stakes_and_generate_proof_shares(
             proof_share_count=proof_share_count,
             reveal_threshold=max(2, proof_share_count),
             proof_label="stake_ciphertext",
-            extra_public_data={
-                "plaintext_label": "stake",
-            },
+            extra_public_data={"plaintext_label": "stake"},
             noise_bound=noise_bound,
         )
         commitment_consistency_proof_shares = proof_generator.build_stake_commitment_consistency_proof(
@@ -198,9 +241,9 @@ def step7_generate_tickets_and_encrypt_suffixes(
     proof_share_count: int,
     distributed_key_result: DistributedKeyGenerationResult | None = None,
 ) -> Dict[str, TicketArtifact]:
-    fhe = MockThresholdFHE(distributed_key_result=distributed_key_result)
-    proof_generator = MockProofShareGenerator()
-    plaintext_modulus = fhe._facade.get_plaintext_modulus()
+    fhe: FHEThresholdFacade = initialize_fhe_backend(distributed_key_result=distributed_key_result)
+    proof_generator = PatentProofShareGenerator()
+    plaintext_modulus = (lottery_modulus() if strict_kms_patent_mode_enabled() else fhe.get_plaintext_modulus())
     ticket_builder = MockTicketBuilder(
         fhe=fhe,
         proof_generator=proof_generator,

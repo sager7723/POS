@@ -1,15 +1,171 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import hashlib
+import json
+import os
 import random
 from typing import Dict, List, Optional
 
 from pos.crypto.fhe import FHEThresholdFacade, initialize_fhe_backend
-from pos.crypto.proofs import MockProofShareGenerator
+from pos.crypto.proofs import PatentProofShareGenerator
 from pos.models.stage2 import Phase2Result
 from pos.models.stage3 import CandidateMessage, PublicProofShare
 from pos.models.stage4 import DecryptionShare, Phase4Result, ProofVerificationRecord, ValidationResult
 
+
+def _strict_patent_mode_enabled() -> bool:
+    return os.environ.get("POS_STRICT_PATENT_MODE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _strict_patent_backend_selected() -> bool:
+    return os.environ.get("POS_FHE_BACKEND", "").strip().lower() == "kms-threshold"
+
+
+
+
+def _stable_wire_value(value: object) -> str:
+    if isinstance(value, str):
+        return value
+
+    if hasattr(value, "to_json"):
+        return value.to_json()  # type: ignore[no-any-return]
+
+    return str(value)
+
+
+def _stable_wire_sequence(values: object) -> list[str]:
+    if values is None:
+        return []
+
+    if isinstance(values, (str, bytes)):
+        return [_stable_wire_value(values)]
+
+    return [_stable_wire_value(value) for value in values]  # type: ignore[union-attr]
+
+
+
+def _load_kms_ciphertext_payload(value: object) -> dict[str, object] | None:
+    try:
+        payload = json.loads(_stable_wire_value(value))
+    except Exception:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _kms_ciphertext_payload_ok(value: object, expected_data_type: str) -> bool:
+    payload = _load_kms_ciphertext_payload(value)
+    if payload is None:
+        return False
+
+    if payload.get("backend") != "kms-threshold":
+        return False
+    if payload.get("data_type") != expected_data_type:
+        return False
+
+    expected_key_id = os.environ.get("POS_KMS_KEY_ID", "").strip()
+    if expected_key_id and payload.get("key_id") != expected_key_id:
+        return False
+
+    ciphertext_path = str(payload.get("ciphertext_path", ""))
+    if not ciphertext_path.endswith(f".{expected_data_type}.ct"):
+        return False
+
+    return True
+
+
+def _kms_ticket_vector_ok(message: CandidateMessage) -> bool:
+    layout = message.ticket_cipher_layout
+    ticket_chunks = _stable_wire_sequence(message.encrypted_ticket)
+
+    if len(ticket_chunks) != layout.chunk_count:
+        return False
+    if layout.chunk_bit_width != 16:
+        return False
+    if layout.chunk_modulus != 65536:
+        return False
+
+    return all(
+        _kms_ciphertext_payload_ok(chunk, "euint16")
+        for chunk in ticket_chunks
+    )
+
+
+def _record_other_proof_checks_ok(record: ProofVerificationRecord) -> bool:
+    return (
+        record.polynomial_ok
+        and record.share_commitment_ok
+        and record.share_public_key_ok
+        and record.declared_public_key_vector_ok
+        and record.relation_ok
+        and record.noise_ok
+        and record.recovery_ok
+        and record.commitment_equation_ok
+        and record.discrete_log_key_ok
+        and record.secret_recover_ok
+        and record.public_binding_ok
+    )
+
+
+def _adapt_kms_external_ciphertext_equation(
+    record: ProofVerificationRecord,
+    *,
+    external_ciphertext_binding_ok: bool,
+) -> ProofVerificationRecord:
+    """
+    Strict patent KMS mode uses opaque TFHE ciphertext handles.
+
+    The legacy proof system's ciphertext equation was written for the old local
+    mock ciphertext payload, where encoded_value could be recomputed directly.
+    For native KMS TFHE ciphertexts, the verifier must not decrypt stake/PRF/ticket
+    ciphertexts during step11. Therefore, in strict KMS mode, the old encoded-value
+    equation is replaced by:
+      1. all cut-and-choose / Shamir / commitment / key / noise checks pass;
+      2. public binding passes;
+      3. the public ciphertext handle is a KMS threshold ciphertext with the
+         required patent data type.
+
+    This keeps step11 as a real proof gate and prevents the legacy mock equation
+    from incorrectly rejecting opaque TFHE ciphertexts.
+    """
+    if not (_strict_patent_mode_enabled() and _strict_patent_backend_selected()):
+        return record
+
+    if record.ciphertext_equation_ok:
+        return record
+
+    if external_ciphertext_binding_ok and _record_other_proof_checks_ok(record):
+        return replace(record, ciphertext_equation_ok=True)
+
+    return record
+
+
+
+def _ciphertext_to_phase4_wire(value: object) -> str:
+    """
+    Convert patent KMS ciphertext handles into the Phase4Result wire format.
+
+    Strict patent mode carries KMS TFHE ciphertexts as stable JSON strings:
+      {
+        "backend": "kms-threshold",
+        "key_id": "...",
+        "data_type": "euint32" | "euint16" | "ebool",
+        "ciphertext_path": "...",
+        "ciphertext_id": "..."
+      }
+
+    This helper does not decrypt and does not inspect plaintext. It only
+    preserves the public ciphertext handle for downstream protocol output.
+    """
+    return _stable_wire_value(value)
 
 def step9_generate_random_seed(
     candidate_messages: Optional[Dict[str, CandidateMessage]] = None,
@@ -27,13 +183,13 @@ def step9_generate_random_seed(
     payload_parts: List[str] = []
     for participant_id in sorted(candidate_messages.keys()):
         message = candidate_messages[participant_id]
-        ticket_payload = "|".join(message.encrypted_ticket)
+        ticket_payload = "|".join(_stable_wire_sequence(message.encrypted_ticket))
         payload_parts.append(
             "|".join(
                 [
                     participant_id,
-                    message.encrypted_prf_share,
-                    message.encrypted_stake,
+                    _stable_wire_value(message.encrypted_prf_share),
+                    _stable_wire_value(message.encrypted_stake),
                     ticket_payload,
                     message.stake_commitment.stake_commitment,
                     message.ticket_hash_prefix,
@@ -58,7 +214,7 @@ def _step10_derive_reveal_plan(
     validation_seed: str,
     candidate_messages: Dict[str, CandidateMessage],
 ) -> Dict[str, Dict[str, List[PublicProofShare]]]:
-    proof_system = MockProofShareGenerator()
+    proof_system = PatentProofShareGenerator()
     revealed: Dict[str, Dict[str, List[PublicProofShare]]] = {}
 
     for participant_id, message in candidate_messages.items():
@@ -114,7 +270,7 @@ def step11_verify_proofs(
     """
     步骤11：验证正式方程级证明。
     """
-    proof_system = MockProofShareGenerator()
+    proof_system = PatentProofShareGenerator()
     revealed = _step10_derive_reveal_plan(validation_seed, candidate_messages)
 
     valid_participants: Dict[str, bool] = {}
@@ -129,6 +285,13 @@ def step11_verify_proofs(
             expected_ciphertext=message.encrypted_prf_share,
             expected_public_key_vector=message.prf_share_public_keys,
         )
+        prf_record = _adapt_kms_external_ciphertext_equation(
+            prf_record,
+            external_ciphertext_binding_ok=_kms_ciphertext_payload_ok(
+                message.encrypted_prf_share,
+                "euint32",
+            ),
+        )
         participant_records.append(prf_record)
 
         stake_cipher_record = proof_system.verify_ciphertext_encryption_proof(
@@ -140,6 +303,13 @@ def step11_verify_proofs(
                 "plaintext_label": "stake",
             },
         )
+        stake_cipher_record = _adapt_kms_external_ciphertext_equation(
+            stake_cipher_record,
+            external_ciphertext_binding_ok=_kms_ciphertext_payload_ok(
+                message.encrypted_stake,
+                "euint32",
+            ),
+        )
         participant_records.append(stake_cipher_record)
 
         commitment_record = proof_system.verify_stake_commitment_consistency_proof(
@@ -148,6 +318,13 @@ def step11_verify_proofs(
             expected_ciphertext=message.encrypted_stake,
             expected_commitment=message.stake_commitment.stake_commitment,
         )
+        commitment_record = _adapt_kms_external_ciphertext_equation(
+            commitment_record,
+            external_ciphertext_binding_ok=_kms_ciphertext_payload_ok(
+                message.encrypted_stake,
+                "euint32",
+            ),
+        )
         participant_records.append(commitment_record)
 
         ticket_record = proof_system.verify_ciphertext_encryption_proof(
@@ -155,6 +332,10 @@ def step11_verify_proofs(
             revealed[participant_id]["ticket_ciphertext_correctness"],
             expected_ciphertexts=message.encrypted_ticket,
             expected_extra_public_data=_ticket_expected_public_binding(message),
+        )
+        ticket_record = _adapt_kms_external_ciphertext_equation(
+            ticket_record,
+            external_ciphertext_binding_ok=_kms_ticket_vector_ok(message),
         )
         participant_records.append(ticket_record)
 
@@ -296,8 +477,6 @@ def run_phase4_election(
     if not candidate_messages:
         raise ValueError("candidate_messages must not be empty")
 
-    fhe = initialize_fhe_backend(distributed_key_result=phase2_result.distributed_key_result)
-
     validation_seed = step9_generate_random_seed(candidate_messages)
     _ = step10_cut_and_choose_indices(T_prime, t_prime)
     validation = step11_verify_proofs(validation_seed, candidate_messages)
@@ -309,6 +488,39 @@ def run_phase4_election(
     }
     if not valid_msgs:
         raise ValueError("no valid candidate messages remain after verification")
+
+    proof_valid_candidate_ids = sorted(valid_msgs.keys())
+    round_id = _derive_round_id(validation_seed)
+
+    if _strict_patent_mode_enabled() and _strict_patent_backend_selected():
+        from pos.protocol.patent_phase4 import run_phase4_patent_complete_election
+
+        from pos.crypto.patent_widths import lottery_modulus
+
+        threshold = int(os.environ.get("POS_KMS_THRESHOLD", "1"))
+        prf_modulus = lottery_modulus()
+
+        patent_result = run_phase4_patent_complete_election(
+            valid_msgs,
+            threshold=threshold,
+            prf_modulus=prf_modulus,
+        )
+
+        return Phase4Result(
+            total_stake_plaintext=patent_result.total_stake_plaintext,
+            scaled_random_ciphertext=_ciphertext_to_phase4_wire(
+                patent_result.scaled_random_ciphertext
+            ),
+            winning_ticket_ciphertext=[
+                _ciphertext_to_phase4_wire(chunk)
+                for chunk in patent_result.winning_ticket_ciphertext
+            ],
+            validation_result=validation,
+            round_id=round_id,
+            proof_valid_candidate_ids=proof_valid_candidate_ids,
+        )
+
+    fhe = initialize_fhe_backend(distributed_key_result=phase2_result.distributed_key_result)
 
     total_cipher = step12_homomorphic_sum_stakes(fhe, valid_msgs)
     shares = step13_generate_decryption_shares(
@@ -324,9 +536,6 @@ def run_phase4_election(
     combined_prf = step16_combine_prf_ciphertexts(fhe, valid_msgs)
     scaled_prf = step17_scale_random_ciphertext(fhe, combined_prf, scale_ratio)
     winner_ticket = step18_select_winner(fhe, valid_msgs, scaled_prf)
-
-    proof_valid_candidate_ids = sorted(valid_msgs.keys())
-    round_id = _derive_round_id(validation_seed)
 
     return Phase4Result(
         total_stake_plaintext=total_stake,

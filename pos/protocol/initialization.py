@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pos.crypto.setup import step0_setup
+from pos.crypto.patent_tfhe_trlwe import attach_tfhe_trlwe_parameters_to_public_parameters
 from pos.spec import SUPPORTED_SECURITY_PARAMETERS, recommend_decryption_threshold
 
 
@@ -13,6 +14,7 @@ def run_phase1_initialization(security_parameter: int = 128) -> dict[str, object
     - recommend_decryption_threshold：t 与参与方数量 T 的推荐关系函数。
     """
     pp = step0_setup(security_parameter)
+    attach_tfhe_trlwe_parameters_to_public_parameters(pp)
     return {
         "public_parameters": pp,
         "supported_security_parameters": SUPPORTED_SECURITY_PARAMETERS,

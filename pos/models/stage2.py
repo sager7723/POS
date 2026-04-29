@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List
+from dataclasses import dataclass, field
+from typing import Any, Dict, List
 
 
 @dataclass(frozen=True)
@@ -99,6 +99,7 @@ class DistributedKeyGenerationResult:
     fhe_backend_name: str
     fhe_keyset_reference: str | None = None
     secret_commitment_public_key: str | None = None
+    tfhe_trlwe_parameters: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def decrypt_key_shares(self) -> Dict[str, ThresholdFHEPrivateKeyShare]:

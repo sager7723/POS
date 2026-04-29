@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Dict, List
 
 from pos.crypto.commitment import MockPedersenCommitment
 from pos.crypto.dkg import DistributedKeyGenerator
 from pos.crypto.random_seed import MockRandomSeedGenerator
+from pos.crypto.patent_tfhe_trlwe import (
+    attach_tfhe_trlwe_parameters_to_public_parameters,
+    build_tfhe_trlwe_parameters,
+    validate_tfhe_trlwe_parameters,
+)
 from pos.models.common import PublicParameters
 from pos.models.stage2 import (
     DistributedKeyGenerationResult,
@@ -50,11 +56,35 @@ def step2_distributed_generate_keys(
     对应专利步骤2：分布式生成完整公钥、解密密钥分片、分片公钥。
     """
     dkg = DistributedKeyGenerator()
-    return dkg.distributed_keygen(
+    result = dkg.distributed_keygen(
         pp=pp,
         threshold=threshold,
         participants=participants,
     )
+
+    participant_ids = [participant.participant_id for participant in participants]
+    tfhe_params = build_tfhe_trlwe_parameters(
+        pp=pp,
+        participant_ids=participant_ids,
+        threshold=threshold,
+    )
+    validate_tfhe_trlwe_parameters(tfhe_params)
+    attach_tfhe_trlwe_parameters_to_public_parameters(
+        pp,
+        participant_ids=participant_ids,
+        threshold=threshold,
+    )
+
+    if tfhe_params.get("enabled"):
+        result = replace(
+            result,
+            public_key=str(tfhe_params["public_key_reference"]),
+            fhe_backend_name=str(tfhe_params["backend_name"]),
+            fhe_keyset_reference=str(tfhe_params["keyset_reference"]),
+            tfhe_trlwe_parameters=dict(tfhe_params),
+        )
+
+    return result
 
 
 def step3_distributed_generate_random_seed(

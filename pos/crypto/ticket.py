@@ -3,31 +3,54 @@ from __future__ import annotations
 import secrets
 from typing import List
 
-from pos.crypto.fhe import MockCiphertext, MockThresholdFHE
-from pos.crypto.proofs import MockProofShareGenerator
+from pos.crypto.fhe import Ciphertext, FHEThresholdFacade
+from pos.crypto.patent_widths import (
+    strict_kms_patent_mode_enabled,
+    ticket_chunk_bits,
+    ticket_chunk_bytes,
+    ticket_data_type,
+    ticket_encoding_family,
+)
+from pos.crypto.proofs import PatentProofShareGenerator
 from pos.models.common import PublicParameters
 from pos.models.stage2 import Participant
 from pos.models.stage3 import TicketArtifact, TicketCipherLayout
 from pos.spec import encode_ticket_preimage, hash_bytes, split_digest_hex
 
 
+def _ciphertext_wire_payload(ciphertext: object) -> str:
+    if isinstance(ciphertext, str):
+        return ciphertext
+
+    payload = getattr(ciphertext, "payload", None)
+    if isinstance(payload, str):
+        return payload
+
+    if hasattr(ciphertext, "to_json"):
+        return ciphertext.to_json()  # type: ignore[no-any-return]
+
+    return str(ciphertext)
+
+
+def _ciphertext_public_metadata(ciphertext: object) -> dict[str, object]:
+    metadata = getattr(ciphertext, "metadata", None)
+    if isinstance(metadata, dict):
+        return dict(metadata)
+    return {}
+
+
 class TicketBuilder:
-    """
-    终版票根密文建模：
+    CHUNK_BYTES = ticket_chunk_bytes()
+    WORD_BITS = ticket_chunk_bits()
+    DATA_TYPE = ticket_data_type()
+    ENCODING_FAMILY = ticket_encoding_family()
 
-    1. 票根后半哈希按固定 2-byte chunk 切分；
-    2. 每个 chunk 单独对应一个密文；
-    3. 同时补齐第3步证明系统和第6步 reveal 所需的布局元数据。
-    """
-
-    CHUNK_BYTES = 2
-    ENCODING_FAMILY = "hex_suffix_word"
     PACKING_MODE = "scalar_per_ciphertext"
     SLOT_PACKING = False
     SLOT_COUNT = 1
     RECOVERY_FORMAT = "hex_concat"
 
-    def __init__(self, fhe: MockThresholdFHE, proof_generator: MockProofShareGenerator) -> None:
+    def __init__(self, fhe: FHEThresholdFacade, proof_generator: PatentProofShareGenerator) -> None:
         self._fhe = fhe
         self._proof_generator = proof_generator
 
@@ -45,10 +68,10 @@ class TicketBuilder:
     def _build_layout(cls, pp: PublicParameters, chunk_count: int) -> TicketCipherLayout:
         return TicketCipherLayout(
             encoding_family=cls.ENCODING_FAMILY,
-            chunk_bit_width=cls.CHUNK_BYTES * 8,
+            chunk_bit_width=cls.WORD_BITS,
             chunk_count=chunk_count,
             hex_chars_per_chunk=cls.CHUNK_BYTES * 2,
-            chunk_modulus=1 << (cls.CHUNK_BYTES * 8),
+            chunk_modulus=1 << cls.WORD_BITS,
             packing_mode=cls.PACKING_MODE,
             slot_packing=cls.SLOT_PACKING,
             byte_order=pp.serialization_byte_order,
@@ -58,6 +81,17 @@ class TicketBuilder:
             slot_count=cls.SLOT_COUNT,
             serialization_byte_order=pp.serialization_byte_order,
         )
+
+    def _encrypt_ticket_chunk(self, chunk_value: int) -> object:
+        if strict_kms_patent_mode_enabled():
+            return self._fhe.encrypt_scalar(
+                int(chunk_value),
+                data_type=self.DATA_TYPE,
+                no_compression=True,
+                no_precompute_sns=True,
+            )
+
+        return self._fhe.encrypt_scalar(chunk_value)
 
     def build_ticket_artifact(
         self,
@@ -84,16 +118,19 @@ class TicketBuilder:
         ticket_layout = self._build_layout(pp, len(suffix_chunks))
 
         encrypted_ticket_suffix_chunks: List[str] = []
+
         for chunk_index, chunk_value in enumerate(suffix_chunks):
-            ciphertext = self._fhe.encrypt(
-                pk=public_key,
-                value=chunk_value,
-            )
-            ciphertext = MockCiphertext(
-                backend=ciphertext.backend,
-                encoded_value=ciphertext.encoded_value,
+            raw_ciphertext = self._encrypt_ticket_chunk(chunk_value)
+
+            if strict_kms_patent_mode_enabled():
+                encrypted_ticket_suffix_chunks.append(_ciphertext_wire_payload(raw_ciphertext))
+                continue
+
+            ciphertext = Ciphertext(
+                backend=raw_ciphertext.backend,
+                encoded_value=raw_ciphertext.encoded_value,
                 metadata={
-                    **ciphertext.metadata,
+                    **_ciphertext_public_metadata(raw_ciphertext),
                     "kind": "ticket_suffix_chunk",
                     "ticket_chunk_bytes": self.CHUNK_BYTES,
                     "ticket_chunk_index": chunk_index,
@@ -102,10 +139,10 @@ class TicketBuilder:
                     "ticket_slot_count": self.SLOT_COUNT,
                     "ticket_byte_order": pp.serialization_byte_order,
                     "encoding_family": self.ENCODING_FAMILY,
-                    "chunk_bit_width": self.CHUNK_BYTES * 8,
+                    "chunk_bit_width": self.WORD_BITS,
                     "chunk_count": len(suffix_chunks),
                     "hex_chars_per_chunk": self.CHUNK_BYTES * 2,
-                    "chunk_modulus": 1 << (self.CHUNK_BYTES * 8),
+                    "chunk_modulus": 1 << self.WORD_BITS,
                     "packing_mode": self.PACKING_MODE,
                     "slot_packing": self.SLOT_PACKING,
                     "byte_order": pp.serialization_byte_order,
@@ -114,7 +151,6 @@ class TicketBuilder:
             )
             encrypted_ticket_suffix_chunks.append(ciphertext.payload)
 
-        # 这里先保留基础 artifact；正式方程级 ticket proof 仍由 candidacy.step7 重新生成并替换
         ticket_proof_shares = self._proof_generator.build_proof_shares(
             statement_type="ciphertext_encryption_correctness",
             statement_public_data={
@@ -122,6 +158,16 @@ class TicketBuilder:
                 "public_key": public_key,
                 "ciphertext": "|".join(encrypted_ticket_suffix_chunks),
                 "plaintext_label": "ticket_hash_suffix_chunks",
+                "proof_label": "ticket_suffix_ciphertext",
+                "encoding_family": self.ENCODING_FAMILY,
+                "chunk_bit_width": str(self.WORD_BITS),
+                "chunk_count": str(len(suffix_chunks)),
+                "hex_chars_per_chunk": str(self.CHUNK_BYTES * 2),
+                "chunk_modulus": str(1 << self.WORD_BITS),
+                "packing_mode": self.PACKING_MODE,
+                "slot_packing": str(self.SLOT_PACKING).lower(),
+                "byte_order": pp.serialization_byte_order,
+                "recovery_format": self.RECOVERY_FORMAT,
             },
             witness_values={
                 "plaintext_scalar": sum(suffix_chunks),

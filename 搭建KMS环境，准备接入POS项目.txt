@@ -1,0 +1,85 @@
+kms环境搭建，准备接入POS项目
+
+
+wsl -d Ubuntu
+source ~/venvs/pos-openfhe310/bin/activate
+cd /mnt/d/biancheng/pycharm/scientific_project/PoS
+
+
+export POS_KMS_KEYGEN_CMD='python /ABS/PATH/to/kms_adapter.py keygen --request __REQUEST_JSON__ --response __RESPONSE_JSON__'
+export POS_KMS_PARTIAL_DEC_CMD='python /ABS/PATH/to/kms_adapter.py partial-decrypt --request __REQUEST_JSON__ --response __RESPONSE_JSON__'
+export POS_KMS_FINAL_DEC_CMD='python /ABS/PATH/to/kms_adapter.py final-decrypt --request __REQUEST_JSON__ --response __RESPONSE_JSON__'
+
+
+
+
+cd /mnt/d/biancheng/pycharm/scientific_project/kms
+
+开四个终端分别执行：
+
+OTEL_EXPORTER_PROMETHEUS_PORT=9464 cargo run --bin kms-server -- --config-file local-threshold-materials/configs/node1.toml
+OTEL_EXPORTER_PROMETHEUS_PORT=9465 cargo run --bin kms-server -- --config-file local-threshold-materials/configs/node2.toml
+OTEL_EXPORTER_PROMETHEUS_PORT=9466 cargo run --bin kms-server -- --config-file local-threshold-materials/configs/node3.toml
+OTEL_EXPORTER_PROMETHEUS_PORT=9467 cargo run --bin kms-server -- --config-file local-threshold-materials/configs/node4.toml
+
+RUST_LOG=threshold_networking=debug,threshold_execution=info,kms_lib=info,kms_server=info \
+OTEL_EXPORTER_PROMETHEUS_PORT=9464 \
+cargo run --bin kms-server -- --config-file local-threshold-materials/configs/node1.toml
+
+RUST_LOG=threshold_networking=debug,threshold_execution=info,kms_lib=info,kms_server=info \
+OTEL_EXPORTER_PROMETHEUS_PORT=9465 \
+cargo run --bin kms-server -- --config-file local-threshold-materials/configs/node2.toml
+
+RUST_LOG=threshold_networking=debug,threshold_execution=info,kms_lib=info,kms_server=info \
+OTEL_EXPORTER_PROMETHEUS_PORT=9466 \
+cargo run --bin kms-server -- --config-file local-threshold-materials/configs/node3.toml
+
+
+RUST_LOG=threshold_networking=debug,threshold_execution=info,kms_lib=info,kms_server=info \
+OTEL_EXPORTER_PROMETHEUS_PORT=9467 \
+cargo run --bin kms-server -- --config-file local-threshold-materials/configs/node4.toml
+
+
+cd /mnt/d/biancheng/pycharm/scientific_project/kms
+
+python3 -m http.server 9000 \
+  --bind 127.0.0.1 \
+  --directory local-threshold-materials/client-public
+
+
+
+cd /mnt/d/biancheng/pycharm/scientific_project/kms
+cargo run --bin kms-init -- \
+  -a http://127.0.0.1:50100 \
+     http://127.0.0.1:50200 \
+     http://127.0.0.1:50300 \
+     http://127.0.0.1:50400
+
+
+#清残留
+cd /mnt/d/biancheng/pycharm/scientific_project/kms
+rm -rf local-threshold-materials/node*/keys/PRIV/Context
+rm -rf local-threshold-materials/node*/keys/PRIV/PrssSetup
+rm -rf local-threshold-materials/node*/keys/PRIV/PrssSetupCombined
+——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+一些关键信息
+KEY_ID=79cfc347735669f693b42767f9760fbb058a8f2e9497cb0da36dbdf1da338860
+PREPROC_ID=1097b4f73caa0fce3a634e36e47d43adedb49ebcce78b5c931250c6d425b7b50
+
+KMS_CORE_CLIENT_CONFIG=/mnt/d/biancheng/pycharm/scientific_project/kms/core-client/config/client_local_threshold.toml
+KMS_KEY_ID=79cfc347735669f693b42767f9760fbb058a8f2e9497cb0da36dbdf1da338860
+KMS_TEST_CIPHERTEXT=/tmp/kms_euint8_7.ct
+KMS_PUBLIC_MATERIAL_ENDPOINT=http://127.0.0.1:9000/kms
+——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+
+python接入KMS环境的测试：
+cd /mnt/d/biancheng/pycharm/scientific_project/PoS
+
+export POS_KMS_CORE_CLIENT_BIN=/mnt/d/biancheng/pycharm/scientific_project/kms/target/debug/kms-core-client
+export POS_KMS_CORE_CLIENT_CONFIG=/mnt/d/biancheng/pycharm/scientific_project/kms/core-client/config/client_local_threshold.toml
+export POS_KMS_KEY_ID=79cfc347735669f693b42767f9760fbb058a8f2e9497cb0da36dbdf1da338860
+export POS_KMS_CIPHERTEXT_DIR=/tmp/pos_kms_ciphertexts
+
+python3 -m pos.manual_check_stage4_kms_bridge
+
+

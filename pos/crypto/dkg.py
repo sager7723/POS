@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import os
 import secrets
 from typing import Dict, List
 
-from pos.crypto.fhe import build_threshold_key_material
+from pos.crypto.thfhe_backend import build_threshold_key_material
 from pos.models.common import PublicParameters
 from pos.models.stage2 import (
     DistributedKeyGenerationResult,
@@ -14,22 +15,31 @@ from pos.models.stage2 import (
     ThresholdFHEPrivateKeyShare,
 )
 
+def _normalize_fhe_backend_name(name: str) -> str:
+    value = name.strip().lower()
+    if value == "kms_threshold":
+        return "kms-threshold"
+    if value == "openfhe-replacement":
+        return "openfhe_replacement"
+    return value
+
+
+def _selected_fhe_backend_name() -> str:
+    return _normalize_fhe_backend_name(os.environ.get("POS_FHE_BACKEND", "thfhe"))
+
+
+def _strict_kms_patent_mode_enabled() -> bool:
+    return (
+        os.environ.get("POS_STRICT_PATENT_MODE", "").strip().lower()
+        in {"1", "true", "yes", "on"}
+        and _selected_fhe_backend_name() == "kms-threshold"
+    )
+
+
+
+
 
 class DistributedKeyGenerator:
-    """
-    阶段2统一 DKG。
-
-    当前实现策略：
-    1. 先保留 Feldman/VSS 风格的真实分布式秘密共享流程，得到每个参与者的聚合标量分片；
-    2. 再把这组参与者集合交给同一个门限 FHE 后端，生成唯一的一套完整公钥与私钥份额句柄；
-    3. 最终输出统一的 DistributedKeyGenerationResult，供阶段3/4/5 直接消费。
-
-    这样阶段2就同时承担：
-    - DKG 数学分片/承诺生成；
-    - 终版门限 FHE 密钥材料落地；
-    - 阶段4/5 解密份额来源固定为阶段2，而不是后续再次自建会话。
-    """
-
     @staticmethod
     def _sample_polynomial(q: int, degree: int) -> List[int]:
         coefficients = [secrets.randbelow(q) for _ in range(degree + 1)]
@@ -74,8 +84,11 @@ class DistributedKeyGenerator:
         participant_count = len(participants)
         if participant_count < 2:
             raise ValueError("participant_count must be at least 2")
-        if threshold < 2 or threshold > participant_count:
-            raise ValueError("threshold must satisfy 2 <= threshold <= participant_count")
+        min_threshold = 1 if _strict_kms_patent_mode_enabled() else 2
+        if threshold < min_threshold or threshold > participant_count:
+            raise ValueError(
+                f"threshold must satisfy {min_threshold} <= threshold <= participant_count"
+            )
 
         degree = threshold - 1
         participant_index_by_id = {
@@ -152,9 +165,12 @@ class DistributedKeyGenerator:
             )
             public_commitment_value = (public_commitment_value * constant_commitment) % pp.p
 
+        selected_fhe_backend = _selected_fhe_backend_name()
+
         generated_key_material = build_threshold_key_material(
             participant_ids=participant_ids,
             threshold=threshold,
+            backend_name=selected_fhe_backend,
         )
 
         threshold_fhe_private_key_shares: Dict[str, ThresholdFHEPrivateKeyShare] = {}

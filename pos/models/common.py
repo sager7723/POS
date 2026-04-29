@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -26,3 +26,4 @@ class PublicParameters:
     serialization_byte_order: str
     serialization_length_bytes: int
     ticket_version: int
+    tfhe_trlwe_parameters: dict[str, Any] = field(default_factory=dict)

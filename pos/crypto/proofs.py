@@ -914,4 +914,39 @@ class FormalEquationProofSuite(_FormalEquationProofBase):
         raise ValueError(f"unsupported statement type: {statement_type}")
 
 
-MockProofShareGenerator = FormalEquationProofSuite
+class PatentProofShareGenerator(FormalEquationProofSuite):
+    """
+    Production-facing proof generator/verifier for the patent protocol.
+
+    This class exposes the formal equation proof suite under the production
+    patent protocol name. It is the strict patent path entry point for:
+
+      1. cut-and-choose reveal selection and verification;
+      2. Shamir share recovery checks;
+      3. Feldman-style share/public-key consistency checks;
+      4. Pedersen stake commitment consistency checks;
+      5. TFHE/KMS ciphertext public-binding checks.
+
+    It must not decrypt non-winning stake, PRF, or ticket ciphertexts.
+    Winning ticket recovery remains isolated in patent_step20.py.
+    """
+
+    PROOF_SYSTEM_NAME = "PatentProofShareGenerator"
+    PROOF_SYSTEM_VERSION = "stage10_f_production_interface_v1"
+
+    COMPONENTS = {
+        "cut_and_choose": "reveal-index based proof-share opening",
+        "shamir": "threshold share recovery and polynomial consistency",
+        "feldman": "share public key / coefficient commitment consistency",
+        "pedersen": "stake commitment consistency",
+        "ciphertext_binding": "KMS TFHE ciphertext handle binding and relation gate",
+    }
+
+    @classmethod
+    def production_component_profile(cls) -> dict[str, str]:
+        return dict(cls.COMPONENTS)
+
+
+# Backward-compatible alias for older tests/imports. Strict patent code should
+# import PatentProofShareGenerator directly.
+MockProofShareGenerator = PatentProofShareGenerator

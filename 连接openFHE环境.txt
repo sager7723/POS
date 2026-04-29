@@ -1,5 +1,0 @@
-wsl -d Ubuntu
-source ~/venvs/pos-openfhe310/bin/activate
-cd /mnt/d/biancheng/pycharm/scientific_project/PoS
-export POS_FHE_BACKEND=openfhe
-python -m pytest tests/test_stage2.py tests/test_stage3.py tests/test_stage4.py tests/test_openfhe_backend.py tests/test_openfhe_stage4.py tests/test_stage5_proofs.py tests/test_stage6_reveal.py
