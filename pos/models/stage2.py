@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from pos.crypto.kms_dkg_transcript import KmsDkgTranscript
 
 
 @dataclass(frozen=True)
@@ -100,6 +104,7 @@ class DistributedKeyGenerationResult:
     fhe_keyset_reference: str | None = None
     secret_commitment_public_key: str | None = None
     tfhe_trlwe_parameters: Dict[str, Any] = field(default_factory=dict)
+    dkg_transcript: "KmsDkgTranscript | None" = None
 
     @property
     def decrypt_key_shares(self) -> Dict[str, ThresholdFHEPrivateKeyShare]:

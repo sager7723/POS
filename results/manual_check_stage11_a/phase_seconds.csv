@@ -1,0 +1,6 @@
+run_id,participant_count,threshold,proof_share_count,strict_kms,phase_name,seconds
+manual-check-stage11-a,4,3,8,True,Phase1_setup,1.571999746374786e-06
+manual-check-stage11-a,4,3,8,True,Phase2_preparation,2.0809966372326016e-06
+manual-check-stage11-a,4,3,8,True,Phase3_candidacy,1.420994522050023e-06
+manual-check-stage11-a,4,3,8,True,Phase4_election,4.09100903198123e-06
+manual-check-stage11-a,4,3,8,True,Phase5_reveal,2.8170034056529403e-06

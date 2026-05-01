@@ -15,6 +15,7 @@ from pos.models.stage2 import (
     ThresholdFHEPrivateKeyShare,
 )
 
+from pos.crypto.kms_dkg_transcript import attach_kms_dkg_transcript_to_result
 def _normalize_fhe_backend_name(name: str) -> str:
     value = name.strip().lower()
     if value == "kms_threshold":
@@ -184,7 +185,10 @@ class DistributedKeyGenerator:
                 key_material_reference=generated_key_material.keyset_reference,
             )
 
-        return DistributedKeyGenerationResult(
+        return attach_kms_dkg_transcript_to_result(
+            pp=pp,
+            participants=participants,
+            result=DistributedKeyGenerationResult(
             public_key=generated_key_material.public_key,
             threshold_fhe_private_key_shares=threshold_fhe_private_key_shares,
             share_public_keys=share_public_keys,
@@ -194,6 +198,7 @@ class DistributedKeyGenerator:
             fhe_backend_name=generated_key_material.backend_name,
             fhe_keyset_reference=generated_key_material.keyset_reference,
             secret_commitment_public_key=f"0x{public_commitment_value:x}",
+        ),
         )
 
 

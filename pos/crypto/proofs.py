@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import os
+from pathlib import Path
 import secrets
 from typing import Dict, List, Mapping, Sequence
 
@@ -42,6 +44,47 @@ class EquationVerificationOutcome:
     noise_ok: bool = True
     declared_public_key_vector_ok: bool = True
     public_binding_ok: bool = True
+
+
+@dataclass(frozen=True)
+class KmsCiphertextPublicBinding:
+    dkg_transcript_hash: str
+    kms_key_id: str
+    ciphertext_id: str
+    ciphertext_path_hash: str
+    public_key_sha256: str
+    participant_id: str
+    statement_type: str
+    data_type: str
+    ciphertext_path: str
+
+    def to_public_data(self) -> dict[str, str]:
+        return {
+            "dkg_transcript_hash": self.dkg_transcript_hash,
+            "kms_key_id": self.kms_key_id,
+            "ciphertext_id": self.ciphertext_id,
+            "ciphertext_path_hash": self.ciphertext_path_hash,
+            "public_key_sha256": self.public_key_sha256,
+            "participant_id": self.participant_id,
+            "statement_type": self.statement_type,
+            "data_type": self.data_type,
+            "ciphertext_path": self.ciphertext_path,
+        }
+
+
+@dataclass(frozen=True)
+class PRFShareCiphertextBindingProof:
+    proof_shares: list[PublicProofShare]
+
+
+@dataclass(frozen=True)
+class StakeCiphertextPedersenConsistencyProof:
+    proof_shares: list[PublicProofShare]
+
+
+@dataclass(frozen=True)
+class TicketSuffixCiphertextBindingProof:
+    proof_shares: list[PublicProofShare]
 
 
 class _FormalEquationProofBase:
@@ -110,8 +153,6 @@ class _FormalEquationProofBase:
                 return int(value.split(":0x", 1)[1], 16) % self._params.field_prime
             if value.startswith("pedersen_commit:0x"):
                 return int(value.split(":0x", 1)[1], 16) % self._params.field_prime
-            if value.startswith("enc("):
-                return self._hash_to_field(value)
             try:
                 return int(value, 16) % self._params.field_prime
             except ValueError:
@@ -370,30 +411,181 @@ class _FormalEquationProofBase:
     def _numeric_close(left: float, right: float, tolerance: float = 1e-6) -> bool:
         return abs(left - right) <= tolerance
 
-    def _parse_ciphertext_payload(self, payload: str) -> dict[str, object]:
-        if payload.startswith("{"):
-            data = json.loads(payload)
-            return {
-                "backend": str(data.get("backend", "unknown")),
-                "encoded_value": data.get("encoded_value", 0),
-                "metadata": dict(data.get("metadata", {})),
-            }
-        if payload.startswith("enc("):
-            value_str = payload.split("value=", 1)[1].rsplit(")", 1)[0]
-            if value_str.startswith("stake(") and value_str.endswith(")"):
-                encoded_value = int(value_str[6:-1])
-            elif value_str.startswith("prf_share:0x"):
-                encoded_value = int(value_str.split(":0x", 1)[1], 16)
-            elif value_str.startswith("ticket_hash_suffix(") and value_str.endswith(")"):
-                encoded_value = int(value_str[len("ticket_hash_suffix("):-1], 16)
-            else:
-                encoded_value = 0
-            return {
-                "backend": "legacy",
-                "encoded_value": encoded_value,
-                "metadata": {"legacy": 1, "noise": 0.0},
-            }
-        raise ValueError("unsupported ciphertext payload encoding")
+    @staticmethod
+    def _strict_patent_mode_enabled() -> bool:
+        return os.environ.get("POS_STRICT_PATENT_MODE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+
+    @staticmethod
+    def _sha256_file_or_text(path_text: str) -> str:
+        path = Path(path_text)
+        hasher = hashlib.sha256()
+        if path.is_file():
+            with path.open("rb") as fh:
+                for block in iter(lambda: fh.read(1024 * 1024), b""):
+                    hasher.update(block)
+            return hasher.hexdigest()
+        hasher.update(path_text.encode("utf-8"))
+        return hasher.hexdigest()
+
+    def _kms_ciphertext_public_binding(
+        self,
+        *,
+        participant_id: str,
+        statement_type: str,
+        ciphertext_payload: str,
+        dkg_transcript_hash: str,
+        public_key_sha256: str,
+    ) -> KmsCiphertextPublicBinding:
+        try:
+            payload = json.loads(ciphertext_payload)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "opaque KMS proof requires ciphertext JSON payload"
+            ) from exc
+
+        if not isinstance(payload, dict):
+            raise ValueError("opaque KMS proof requires ciphertext JSON object")
+
+        if payload.get("backend") != "kms-threshold":
+            raise ValueError(
+                "opaque KMS proof requires backend='kms-threshold'; "
+                f"got {payload.get('backend')!r}"
+            )
+
+        ciphertext_path = str(payload.get("ciphertext_path", ""))
+        if not ciphertext_path:
+            raise ValueError("opaque KMS proof requires ciphertext_path")
+
+        return KmsCiphertextPublicBinding(
+            dkg_transcript_hash=str(dkg_transcript_hash),
+            kms_key_id=str(payload.get("key_id", "")),
+            ciphertext_id=str(payload.get("ciphertext_id", "")),
+            ciphertext_path_hash=self._sha256_file_or_text(ciphertext_path),
+            public_key_sha256=str(public_key_sha256),
+            participant_id=str(participant_id),
+            statement_type=str(statement_type),
+            data_type=str(payload.get("data_type", "")),
+            ciphertext_path=ciphertext_path,
+        )
+
+    def _kms_ciphertext_public_bindings_json(
+        self,
+        *,
+        participant_id: str,
+        statement_type: str,
+        ciphertext_payloads: Sequence[str],
+        dkg_transcript_hash: str,
+        public_key_sha256: str,
+    ) -> str:
+        bindings = [
+            self._kms_ciphertext_public_binding(
+                participant_id=participant_id,
+                statement_type=statement_type,
+                ciphertext_payload=str(payload),
+                dkg_transcript_hash=dkg_transcript_hash,
+                public_key_sha256=public_key_sha256,
+            ).to_public_data()
+            for payload in ciphertext_payloads
+        ]
+        return self._json_dumps_list(bindings)
+
+    def _statement_witness_commitment(
+        self,
+        *,
+        statement_type: str,
+        participant_id: str,
+        witness_values: Mapping[str, int],
+    ) -> str:
+        return self._hash_hex(
+            self._canonical_json(
+                {
+                    "statement_type": statement_type,
+                    "participant_id": participant_id,
+                    "witness_values": {
+                        name: str(value)
+                        for name, value in sorted(witness_values.items())
+                    },
+                }
+            )
+        )
+
+    def _opaque_public_binding_ok(
+        self,
+        *,
+        public_data: Mapping[str, str],
+        expected_ciphertexts: Sequence[str],
+        expected_extra_public_data: Mapping[str, str] | None = None,
+    ) -> bool:
+        expected_bindings_json = self._kms_ciphertext_public_bindings_json(
+            participant_id=str(public_data.get("participant_id", "")),
+            statement_type=str(public_data.get("opaque_statement_type", public_data.get("proof_label", ""))),
+            ciphertext_payloads=[str(item) for item in expected_ciphertexts],
+            dkg_transcript_hash=str(public_data.get("dkg_transcript_hash", "")),
+            public_key_sha256=str(public_data.get("public_key_sha256", "")),
+        )
+
+        if public_data.get("ciphertext_bindings_json") != expected_bindings_json:
+            return False
+
+        if expected_extra_public_data:
+            for key, expected_value in expected_extra_public_data.items():
+                if public_data.get(key) != expected_value:
+                    return False
+
+        return True
+
+    def _build_opaque_kms_binding_shares(
+        self,
+        *,
+        statement_type: str,
+        opaque_statement_type: str,
+        participant_id: str,
+        ciphertext_payloads: Sequence[str],
+        public_key: str,
+        dkg_transcript_hash: str,
+        public_key_sha256: str,
+        witness_values: Mapping[str, int],
+        proof_share_count: int,
+        reveal_threshold: int,
+        extra_public_data: Mapping[str, str] | None = None,
+    ) -> List[PublicProofShare]:
+        statement_public_data = {
+            "strict_opaque_kms_binding": "true",
+            "opaque_statement_type": opaque_statement_type,
+            "participant_id": participant_id,
+            "public_key": public_key,
+            "dkg_transcript_hash": dkg_transcript_hash,
+            "public_key_sha256": public_key_sha256,
+            "ciphertext_bindings_json": self._kms_ciphertext_public_bindings_json(
+                participant_id=participant_id,
+                statement_type=opaque_statement_type,
+                ciphertext_payloads=ciphertext_payloads,
+                dkg_transcript_hash=dkg_transcript_hash,
+                public_key_sha256=public_key_sha256,
+            ),
+            "witness_commitment": self._statement_witness_commitment(
+                statement_type=opaque_statement_type,
+                participant_id=participant_id,
+                witness_values=witness_values,
+            ),
+        }
+        if extra_public_data:
+            statement_public_data.update(dict(extra_public_data))
+
+        return self._build_witness_shares(
+            statement_type=statement_type,
+            statement_public_data=statement_public_data,
+            witness_values=witness_values,
+            proof_share_count=proof_share_count,
+            reveal_threshold=reveal_threshold,
+            noise_estimate=0,
+            noise_bound=0,
+        )
 
     def _extract_ciphertext_payloads(self, statement_public_data: Mapping[str, str]) -> List[str]:
         if statement_public_data.get("ciphertext_vector_json"):
@@ -430,6 +622,48 @@ class _FormalEquationProofBase:
 
 
 class PRFShareCorrectnessProofSystem(_FormalEquationProofBase):
+    def build_opaque_binding_proof(
+        self,
+        *,
+        participant_id: str,
+        encrypted_prf_share: str,
+        public_key: str,
+        prf_share_scalar: int,
+        key_share_scalar: int,
+        dlog_generator: int,
+        dlog_modulus: int,
+        declared_share_public_key: str,
+        declared_share_public_key_set: Sequence[str],
+        proof_share_count: int,
+        reveal_threshold: int,
+        dkg_transcript_hash: str,
+        public_key_sha256: str,
+    ) -> List[PublicProofShare]:
+        witness_values = {
+            "prf_scalar": int(prf_share_scalar),
+            "key_share_scalar": int(key_share_scalar),
+        }
+        return self._build_opaque_kms_binding_shares(
+            statement_type="prf_share_correctness",
+            opaque_statement_type="prf_share_ciphertext_binding",
+            participant_id=participant_id,
+            ciphertext_payloads=[encrypted_prf_share],
+            public_key=public_key,
+            dkg_transcript_hash=dkg_transcript_hash,
+            public_key_sha256=public_key_sha256,
+            witness_values=witness_values,
+            proof_share_count=proof_share_count,
+            reveal_threshold=reveal_threshold,
+            extra_public_data={
+                "dlog_generator": str(dlog_generator),
+                "dlog_modulus": str(dlog_modulus),
+                "declared_share_public_key": declared_share_public_key,
+                "declared_share_public_key_set_json": self._json_dumps_list(
+                    list(declared_share_public_key_set)
+                ),
+            },
+        )
+
     def build_proof(
         self,
         *,
@@ -501,54 +735,86 @@ class PRFShareCorrectnessProofSystem(_FormalEquationProofBase):
                 recovery_ok = False
 
         public_data = first.statement_public_data
-        declared_public_key_set = [str(item) for item in self._json_loads_list(public_data.get("declared_share_public_key_set_json"))]
+        declared_public_key_set = [
+            str(item)
+            for item in self._json_loads_list(public_data.get("declared_share_public_key_set_json"))
+        ]
         declared_public_key_vector_ok = list(expected_public_key_vector) == declared_public_key_set
-        public_binding_ok = public_data.get("encrypted_prf_share") == expected_ciphertext
 
-        ciphertext_equation_ok = True
-        discrete_log_key_ok = True
-        equation_noise_ok = True
-        if recovery_ok:
-            cipher = self._parse_ciphertext_payload(public_data["encrypted_prf_share"])
-            plaintext_modulus = max(1, self._coerce_int(public_data["plaintext_modulus"]))
-            expected_plain = recovered.get("prf_scalar", 0) % plaintext_modulus
-            actual_plain = self._coerce_int(cipher["encoded_value"]) % plaintext_modulus
-            ciphertext_equation_ok = expected_plain == actual_plain
+        if public_data.get("strict_opaque_kms_binding") == "true":
+            public_binding_ok = self._opaque_public_binding_ok(
+                public_data=public_data,
+                expected_ciphertexts=[expected_ciphertext],
+            )
+            discrete_log_key_ok = True
+            if recovery_ok:
+                declared_share_public_key = public_data["declared_share_public_key"]
+                dlog_generator = self._coerce_int(public_data["dlog_generator"])
+                dlog_modulus = self._coerce_int(public_data["dlog_modulus"])
+                recovered_key_share = recovered.get("key_share_scalar", 0)
+                computed_share_public_key = f"0x{pow(dlog_generator, recovered_key_share, dlog_modulus):x}"
+                discrete_log_key_ok = (
+                    computed_share_public_key == declared_share_public_key
+                    and declared_share_public_key in declared_public_key_set
+                )
 
-            declared_share_public_key = public_data["declared_share_public_key"]
-            dlog_generator = self._coerce_int(public_data["dlog_generator"])
-            dlog_modulus = self._coerce_int(public_data["dlog_modulus"])
-            recovered_key_share = recovered.get("key_share_scalar", 0)
-            computed_share_public_key = f"0x{pow(dlog_generator, recovered_key_share, dlog_modulus):x}"
-            discrete_log_key_ok = (
-                computed_share_public_key == declared_share_public_key
-                and declared_share_public_key in declared_public_key_set
+            return ProofVerificationRecord(
+                statement_type=first.statement_type,
+                revealed_indices=revealed_indices,
+                polynomial_ok=polynomial_ok,
+                share_commitment_ok=share_commitment_ok,
+                share_public_key_ok=share_public_key_ok,
+                declared_public_key_vector_ok=declared_public_key_vector_ok,
+                relation_ok=relation_ok and public_binding_ok,
+                noise_ok=bundle_noise_ok,
+                recovery_attempted=recovery_attempted,
+                recovery_ok=recovery_ok,
+                ciphertext_equation_ok=public_binding_ok,
+                commitment_equation_ok=True,
+                discrete_log_key_ok=discrete_log_key_ok,
+                secret_recover_ok=recovery_ok,
+                public_binding_ok=public_binding_ok,
             )
 
-            actual_noise = self._coerce_int(dict(cipher["metadata"]).get("noise", 0))
-            recovered_noise = recovered.get("ciphertext_noise", 0)
-            equation_noise_ok = recovered_noise == actual_noise and recovered_noise <= first.noise_bound
-
-        return ProofVerificationRecord(
-            statement_type=first.statement_type,
-            revealed_indices=revealed_indices,
-            polynomial_ok=polynomial_ok,
-            share_commitment_ok=share_commitment_ok,
-            share_public_key_ok=share_public_key_ok,
-            declared_public_key_vector_ok=declared_public_key_vector_ok,
-            relation_ok=relation_ok and public_binding_ok,
-            noise_ok=bundle_noise_ok and equation_noise_ok,
-            recovery_attempted=recovery_attempted,
-            recovery_ok=recovery_ok,
-            ciphertext_equation_ok=ciphertext_equation_ok,
-            commitment_equation_ok=True,
-            discrete_log_key_ok=discrete_log_key_ok,
-            secret_recover_ok=recovery_ok,
-            public_binding_ok=public_binding_ok,
-        )
+        raise RuntimeError("non-opaque PRF proof verification is disabled in the production path")
 
 
 class CiphertextEncryptionCorrectnessProofSystem(_FormalEquationProofBase):
+    def build_opaque_binding_proof(
+        self,
+        *,
+        participant_id: str,
+        ciphertext_payloads: Sequence[str],
+        public_key: str,
+        witness_components: Sequence[int],
+        proof_share_count: int,
+        reveal_threshold: int,
+        proof_label: str,
+        dkg_transcript_hash: str,
+        public_key_sha256: str,
+        extra_public_data: Mapping[str, str] | None = None,
+    ) -> List[PublicProofShare]:
+        witness_values: Dict[str, int] = {
+            f"witness_component_{index}": int(value)
+            for index, value in enumerate(witness_components)
+        }
+        public_extra = {"proof_label": proof_label}
+        if extra_public_data:
+            public_extra.update(dict(extra_public_data))
+        return self._build_opaque_kms_binding_shares(
+            statement_type="ciphertext_encryption_correctness",
+            opaque_statement_type=proof_label,
+            participant_id=participant_id,
+            ciphertext_payloads=ciphertext_payloads,
+            public_key=public_key,
+            dkg_transcript_hash=dkg_transcript_hash,
+            public_key_sha256=public_key_sha256,
+            witness_values=witness_values,
+            proof_share_count=proof_share_count,
+            reveal_threshold=reveal_threshold,
+            extra_public_data=public_extra,
+        )
+
     def build_proof(
         self,
         *,
@@ -612,7 +878,6 @@ class CiphertextEncryptionCorrectnessProofSystem(_FormalEquationProofBase):
 
         recovery_attempted = len(proof_shares) >= first.reveal_threshold
         recovery_ok = True
-        recovered: Dict[str, int] = {}
         if recovery_attempted:
             try:
                 recovered = self.recover_witness_scalars(proof_shares)
@@ -621,28 +886,14 @@ class CiphertextEncryptionCorrectnessProofSystem(_FormalEquationProofBase):
                 recovery_ok = False
 
         public_data = first.statement_public_data
-        public_binding_ok = self._extract_ciphertext_payloads(public_data) == list(expected_ciphertexts)
-        if expected_extra_public_data:
-            for key, expected_value in expected_extra_public_data.items():
-                if public_data.get(key) != expected_value:
-                    public_binding_ok = False
-                    break
+        if public_data.get("strict_opaque_kms_binding") != "true":
+            raise RuntimeError("non-opaque ciphertext proof verification is disabled in the production path")
 
-        ciphertext_equation_ok = True
-        equation_noise_ok = True
-        if recovery_ok:
-            plaintext_modulus = max(1, self._coerce_int(public_data["plaintext_modulus"]))
-            ciphertext_payloads = self._extract_ciphertext_payloads(public_data)
-            for index, payload in enumerate(ciphertext_payloads):
-                cipher = self._parse_ciphertext_payload(payload)
-                expected_plain = recovered.get(f"plaintext_component_{index}", 0) % plaintext_modulus
-                actual_plain = self._coerce_int(cipher["encoded_value"]) % plaintext_modulus
-                if expected_plain != actual_plain:
-                    ciphertext_equation_ok = False
-                actual_noise = self._coerce_int(dict(cipher["metadata"]).get("noise", 0))
-                recovered_noise = recovered.get(f"ciphertext_noise_{index}", 0)
-                if recovered_noise != actual_noise or recovered_noise > first.noise_bound:
-                    equation_noise_ok = False
+        public_binding_ok = self._opaque_public_binding_ok(
+            public_data=public_data,
+            expected_ciphertexts=expected_ciphertexts,
+            expected_extra_public_data=expected_extra_public_data,
+        )
 
         return ProofVerificationRecord(
             statement_type=first.statement_type,
@@ -652,10 +903,10 @@ class CiphertextEncryptionCorrectnessProofSystem(_FormalEquationProofBase):
             share_public_key_ok=share_public_key_ok,
             declared_public_key_vector_ok=True,
             relation_ok=relation_ok and public_binding_ok,
-            noise_ok=bundle_noise_ok and equation_noise_ok,
+            noise_ok=bundle_noise_ok,
             recovery_attempted=recovery_attempted,
             recovery_ok=recovery_ok,
-            ciphertext_equation_ok=ciphertext_equation_ok,
+            ciphertext_equation_ok=public_binding_ok,
             commitment_equation_ok=True,
             discrete_log_key_ok=True,
             secret_recover_ok=recovery_ok,
@@ -664,6 +915,46 @@ class CiphertextEncryptionCorrectnessProofSystem(_FormalEquationProofBase):
 
 
 class StakeCommitmentConsistencyProofSystem(_FormalEquationProofBase):
+    def build_opaque_binding_proof(
+        self,
+        *,
+        participant_id: str,
+        encrypted_stake: str,
+        stake_commitment: str,
+        public_key: str,
+        stake_scalar: int,
+        pedersen_randomness: int,
+        pedersen_g: int,
+        pedersen_h: int,
+        pedersen_modulus: int,
+        proof_share_count: int,
+        reveal_threshold: int,
+        dkg_transcript_hash: str,
+        public_key_sha256: str,
+    ) -> List[PublicProofShare]:
+        witness_values = {
+            "stake_scalar": int(stake_scalar),
+            "pedersen_randomness": int(pedersen_randomness),
+        }
+        return self._build_opaque_kms_binding_shares(
+            statement_type="stake_commitment_consistency",
+            opaque_statement_type="stake_ciphertext_pedersen_binding",
+            participant_id=participant_id,
+            ciphertext_payloads=[encrypted_stake],
+            public_key=public_key,
+            dkg_transcript_hash=dkg_transcript_hash,
+            public_key_sha256=public_key_sha256,
+            witness_values=witness_values,
+            proof_share_count=proof_share_count,
+            reveal_threshold=reveal_threshold,
+            extra_public_data={
+                "stake_commitment": stake_commitment,
+                "pedersen_g": str(pedersen_g),
+                "pedersen_h": str(pedersen_h),
+                "pedersen_modulus": str(pedersen_modulus),
+            },
+        )
+
     def build_proof(
         self,
         *,
@@ -735,34 +1026,31 @@ class StakeCommitmentConsistencyProofSystem(_FormalEquationProofBase):
                 recovery_ok = False
 
         public_data = first.statement_public_data
+        if public_data.get("strict_opaque_kms_binding") != "true":
+            raise RuntimeError("non-opaque stake proof verification is disabled in the production path")
+
         public_binding_ok = (
-            public_data.get("encrypted_stake") == expected_ciphertext
-            and public_data.get("stake_commitment") == expected_commitment
+            public_data.get("stake_commitment") == expected_commitment
+            and self._opaque_public_binding_ok(
+                public_data=public_data,
+                expected_ciphertexts=[expected_ciphertext],
+            )
         )
 
-        ciphertext_equation_ok = True
         commitment_equation_ok = True
-        equation_noise_ok = True
         if recovery_ok:
-            cipher = self._parse_ciphertext_payload(public_data["encrypted_stake"])
-            plaintext_modulus = max(1, self._coerce_int(public_data["plaintext_modulus"]))
-            stake_scalar = recovered.get("stake_scalar", 0)
-            actual_plain = self._coerce_int(cipher["encoded_value"]) % plaintext_modulus
-            ciphertext_equation_ok = (stake_scalar % plaintext_modulus) == actual_plain
-
-            actual_noise = self._coerce_int(dict(cipher["metadata"]).get("noise", 0))
-            recovered_noise = recovered.get("ciphertext_noise", 0)
-            equation_noise_ok = recovered_noise == actual_noise and recovered_noise <= first.noise_bound
-
             pedersen_g = self._coerce_int(public_data["pedersen_g"])
             pedersen_h = self._coerce_int(public_data["pedersen_h"])
             pedersen_modulus = self._coerce_int(public_data["pedersen_modulus"])
+            stake_scalar = recovered.get("stake_scalar", 0)
             pedersen_randomness = recovered.get("pedersen_randomness", 0)
-            expected_commitment_value = (
+            commitment_value = (
                 pow(pedersen_g, stake_scalar, pedersen_modulus)
                 * pow(pedersen_h, pedersen_randomness, pedersen_modulus)
             ) % pedersen_modulus
-            commitment_equation_ok = public_data["stake_commitment"] == f"pedersen_commit:0x{expected_commitment_value:x}"
+            commitment_equation_ok = (
+                public_data["stake_commitment"] == f"pedersen_commit:0x{commitment_value:x}"
+            )
 
         return ProofVerificationRecord(
             statement_type=first.statement_type,
@@ -772,10 +1060,10 @@ class StakeCommitmentConsistencyProofSystem(_FormalEquationProofBase):
             share_public_key_ok=share_public_key_ok,
             declared_public_key_vector_ok=True,
             relation_ok=relation_ok and public_binding_ok,
-            noise_ok=bundle_noise_ok and equation_noise_ok,
+            noise_ok=bundle_noise_ok,
             recovery_attempted=recovery_attempted,
             recovery_ok=recovery_ok,
-            ciphertext_equation_ok=ciphertext_equation_ok,
+            ciphertext_equation_ok=public_binding_ok,
             commitment_equation_ok=commitment_equation_ok,
             discrete_log_key_ok=True,
             secret_recover_ok=recovery_ok,
@@ -789,6 +1077,18 @@ class FormalEquationProofSuite(_FormalEquationProofBase):
         self._prf = PRFShareCorrectnessProofSystem(self.params)
         self._cipher = CiphertextEncryptionCorrectnessProofSystem(self.params)
         self._stake = StakeCommitmentConsistencyProofSystem(self.params)
+
+    def build_prf_share_ciphertext_binding_proof(self, **kwargs: object) -> List[PublicProofShare]:
+        return self._prf.build_opaque_binding_proof(**kwargs)
+
+    def build_stake_ciphertext_pedersen_binding_proof(self, **kwargs: object) -> List[PublicProofShare]:
+        return self._stake.build_opaque_binding_proof(**kwargs)
+
+    def build_ticket_suffix_ciphertext_binding_proof(self, **kwargs: object) -> List[PublicProofShare]:
+        return self._cipher.build_opaque_binding_proof(**kwargs)
+
+    def build_ciphertext_binding_proof(self, **kwargs: object) -> List[PublicProofShare]:
+        return self._cipher.build_opaque_binding_proof(**kwargs)
 
     def build_prf_share_proof(self, **kwargs: object) -> List[PublicProofShare]:
         return self._prf.build_proof(**kwargs)

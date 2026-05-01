@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import secrets
 from dataclasses import replace
 from typing import Dict, List
 
@@ -57,14 +55,25 @@ def _encrypt_scalar_wire_payload(fhe: FHEThresholdFacade, value: int) -> str:
     return _ciphertext_wire_payload(fhe.encrypt_scalar(value))
 
 
-def _sample_proof_randomizer(proof_generator: PatentProofShareGenerator) -> int:
-    return secrets.randbelow(proof_generator.params.field_prime)
 
 
-def _extract_public_noise(ciphertext_payload: str) -> int:
-    data = json.loads(ciphertext_payload)
-    metadata = dict(data.get("metadata", {}))
-    return int(round(float(metadata.get("noise", 0))))
+def _strict_kms_binding_context(
+    distributed_key_result: DistributedKeyGenerationResult | None,
+) -> dict[str, str]:
+    if not strict_kms_patent_mode_enabled():
+        return {}
+
+    if distributed_key_result is None:
+        raise RuntimeError("strict KMS proof binding requires DistributedKeyGenerationResult")
+
+    transcript = getattr(distributed_key_result, "dkg_transcript", None)
+    if transcript is None:
+        raise RuntimeError("strict KMS proof binding requires dkg_transcript")
+
+    return {
+        "dkg_transcript_hash": transcript.transcript_hash,
+        "public_key_sha256": transcript.public_material.public_key_sha256,
+    }
 
 
 def _sorted_phase2_share_public_keys(
@@ -119,7 +128,6 @@ def step5_encrypt_prf_shares_and_generate_proof_shares(
         pp = step0_setup(128)
     fhe: FHEThresholdFacade = initialize_fhe_backend(distributed_key_result=distributed_key_result)
     proof_generator = PatentProofShareGenerator()
-    plaintext_modulus = (lottery_modulus() if strict_kms_patent_mode_enabled() else fhe.get_plaintext_modulus())
 
     declared_share_public_key_set = _sorted_phase2_share_public_keys(distributed_key_result)
     artifacts: Dict[str, EncryptedPRFShareArtifact] = {}
@@ -135,18 +143,18 @@ def step5_encrypt_prf_shares_and_generate_proof_shares(
             prf_share_plain_value = prf_share_plain_value % lottery_modulus()
 
         encrypted_prf_share = _encrypt_scalar_wire_payload(fhe, prf_share_plain_value)
-        ciphertext_noise = _extract_public_noise(encrypted_prf_share)
 
         declared_share_public_key = (
             distributed_key_result.share_public_keys[participant_id].share_public_key
             if distributed_key_result is not None
             else ""
         )
-        proof_shares = proof_generator.build_prf_share_proof(
+
+        binding_context = _strict_kms_binding_context(distributed_key_result)
+        proof_shares = proof_generator.build_prf_share_ciphertext_binding_proof(
             participant_id=participant_id,
             encrypted_prf_share=encrypted_prf_share,
             public_key=public_key,
-            plaintext_modulus=plaintext_modulus,
             prf_share_scalar=proof_generator.scalarize_value(prf_share.prf_share),
             key_share_scalar=prf_share.key_share_scalar,
             dlog_generator=pp.g_prime,
@@ -155,9 +163,7 @@ def step5_encrypt_prf_shares_and_generate_proof_shares(
             declared_share_public_key_set=declared_share_public_key_set,
             proof_share_count=proof_share_count,
             reveal_threshold=max(2, proof_share_count),
-            encryption_randomizer=_sample_proof_randomizer(proof_generator),
-            noise_estimate=ciphertext_noise,
-            noise_bound=max(ciphertext_noise, 0),
+            **binding_context,
         )
 
         artifacts[participant_id] = EncryptedPRFShareArtifact(
@@ -182,46 +188,37 @@ def step6_encrypt_stakes_and_generate_proof_shares(
         pp = step0_setup(128)
     fhe: FHEThresholdFacade = initialize_fhe_backend(distributed_key_result=distributed_key_result)
     proof_generator = PatentProofShareGenerator()
-    plaintext_modulus = (lottery_modulus() if strict_kms_patent_mode_enabled() else fhe.get_plaintext_modulus())
 
     artifacts: Dict[str, EncryptedStakeArtifact] = {}
     for participant in participants:
         participant_id = participant.participant_id
         encrypted_stake = _encrypt_scalar_wire_payload(fhe, participant.stake_value)
-        ciphertext_noise = _extract_public_noise(encrypted_stake)
-        encryption_randomizer = _sample_proof_randomizer(proof_generator)
-        noise_bound = max(ciphertext_noise, 0)
 
-        stake_ciphertext_proof_shares = proof_generator.build_ciphertext_encryption_proof(
+        binding_context = _strict_kms_binding_context(distributed_key_result)
+        stake_ciphertext_proof_shares = proof_generator.build_ciphertext_binding_proof(
             participant_id=participant_id,
             ciphertext_payloads=[encrypted_stake],
             public_key=public_key,
-            plaintext_modulus=plaintext_modulus,
-            plaintext_components=[participant.stake_value],
-            encryption_randomizers=[encryption_randomizer],
-            noise_values=[ciphertext_noise],
+            witness_components=[participant.stake_value],
             proof_share_count=proof_share_count,
             reveal_threshold=max(2, proof_share_count),
             proof_label="stake_ciphertext",
-            extra_public_data={"plaintext_label": "stake"},
-            noise_bound=noise_bound,
+            extra_public_data={"witness_label": "stake"},
+            **binding_context,
         )
-        commitment_consistency_proof_shares = proof_generator.build_stake_commitment_consistency_proof(
+        commitment_consistency_proof_shares = proof_generator.build_stake_ciphertext_pedersen_binding_proof(
             participant_id=participant_id,
             encrypted_stake=encrypted_stake,
             stake_commitment=commitments[participant_id].stake_commitment,
             public_key=public_key,
-            plaintext_modulus=plaintext_modulus,
             stake_scalar=participant.stake_value,
             pedersen_randomness=commitments[participant_id].commit_randomness,
-            encryption_randomizer=encryption_randomizer,
-            ciphertext_noise=ciphertext_noise,
             pedersen_g=pp.g,
             pedersen_h=pp.h,
             pedersen_modulus=pp.p,
             proof_share_count=proof_share_count,
             reveal_threshold=max(2, proof_share_count),
-            noise_bound=noise_bound,
+            **binding_context,
         )
 
         artifacts[participant_id] = EncryptedStakeArtifact(
@@ -243,7 +240,6 @@ def step7_generate_tickets_and_encrypt_suffixes(
 ) -> Dict[str, TicketArtifact]:
     fhe: FHEThresholdFacade = initialize_fhe_backend(distributed_key_result=distributed_key_result)
     proof_generator = PatentProofShareGenerator()
-    plaintext_modulus = (lottery_modulus() if strict_kms_patent_mode_enabled() else fhe.get_plaintext_modulus())
     ticket_builder = MockTicketBuilder(
         fhe=fhe,
         proof_generator=proof_generator,
@@ -258,32 +254,30 @@ def step7_generate_tickets_and_encrypt_suffixes(
             proof_share_count=proof_share_count,
         )
 
-        ciphertext_noises = [_extract_public_noise(payload) for payload in artifact.encrypted_ticket_suffix_chunks]
-        encryption_randomizers = [_sample_proof_randomizer(proof_generator) for _ in artifact.encrypted_ticket_suffix_chunks]
-        ticket_proof_shares = proof_generator.build_ciphertext_encryption_proof(
+        ticket_extra_public_data = {
+            "plaintext_label": "ticket_hash_suffix_chunk_words",
+            "encoding_family": artifact.ticket_cipher_layout.encoding_family,
+            "chunk_bit_width": str(artifact.ticket_cipher_layout.chunk_bit_width),
+            "chunk_count": str(artifact.ticket_cipher_layout.chunk_count),
+            "hex_chars_per_chunk": str(artifact.ticket_cipher_layout.hex_chars_per_chunk),
+            "chunk_modulus": str(artifact.ticket_cipher_layout.chunk_modulus),
+            "packing_mode": artifact.ticket_cipher_layout.packing_mode,
+            "slot_packing": str(artifact.ticket_cipher_layout.slot_packing).lower(),
+            "byte_order": artifact.ticket_cipher_layout.byte_order,
+            "recovery_format": artifact.ticket_cipher_layout.recovery_format,
+        }
+
+        binding_context = _strict_kms_binding_context(distributed_key_result)
+        ticket_proof_shares = proof_generator.build_ticket_suffix_ciphertext_binding_proof(
             participant_id=participant.participant_id,
             ciphertext_payloads=artifact.encrypted_ticket_suffix_chunks,
             public_key=public_key,
-            plaintext_modulus=plaintext_modulus,
-            plaintext_components=artifact.ticket_hash_suffix_chunks,
-            encryption_randomizers=encryption_randomizers,
-            noise_values=ciphertext_noises,
+            witness_components=artifact.ticket_hash_suffix_chunks,
             proof_share_count=proof_share_count,
             reveal_threshold=max(2, proof_share_count),
             proof_label="ticket_suffix_ciphertext",
-            extra_public_data={
-                "plaintext_label": "ticket_hash_suffix_chunk_words",
-                "encoding_family": artifact.ticket_cipher_layout.encoding_family,
-                "chunk_bit_width": str(artifact.ticket_cipher_layout.chunk_bit_width),
-                "chunk_count": str(artifact.ticket_cipher_layout.chunk_count),
-                "hex_chars_per_chunk": str(artifact.ticket_cipher_layout.hex_chars_per_chunk),
-                "chunk_modulus": str(artifact.ticket_cipher_layout.chunk_modulus),
-                "packing_mode": artifact.ticket_cipher_layout.packing_mode,
-                "slot_packing": str(artifact.ticket_cipher_layout.slot_packing).lower(),
-                "byte_order": artifact.ticket_cipher_layout.byte_order,
-                "recovery_format": artifact.ticket_cipher_layout.recovery_format,
-            },
-            noise_bound=max(ciphertext_noises) if ciphertext_noises else 0,
+            extra_public_data=ticket_extra_public_data,
+            **binding_context,
         )
         artifacts[participant.participant_id] = replace(
             artifact,

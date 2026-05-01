@@ -1,0 +1,89 @@
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+from pathlib import Path
+
+
+class KmsOracleEvaluatorForbiddenError(RuntimeError):
+    pass
+
+
+_EXPECTED_ORACLE_PATTERN = re.compile(
+    r"expected-result|expected-index|expected_result|expected_index|POS_KMS_EVAL_.*EXPECTED",
+    re.IGNORECASE,
+)
+
+
+def strict_kms_patent_mode_enabled() -> bool:
+    return (
+        os.environ.get("POS_STRICT_PATENT_MODE", "").strip().lower()
+        in {"1", "true", "yes", "on"}
+        and os.environ.get("POS_FHE_BACKEND", "").strip().lower().replace("_", "-")
+        == "kms-threshold"
+    )
+
+
+def assert_no_expected_oracle_evaluator() -> None:
+    """
+    Stage C-1 strict guard.
+
+    In strict patent mode, the POS project must not use a KMS/TFHE evaluator
+    whose CLI still exposes expected-result / expected-index oracle arguments.
+
+    This guard does not claim that the evaluator is fully patent-compliant.
+    It only blocks the known oracle evaluator from being used as if it were a
+    real TFHE/RLWE homomorphic evaluator.
+    """
+    if not strict_kms_patent_mode_enabled():
+        return
+
+    eval_bin = os.environ.get("POS_KMS_TFHE_EVAL_BIN")
+    if not eval_bin:
+        raise KmsOracleEvaluatorForbiddenError(
+            "POS_STRICT_PATENT_MODE=1 and POS_FHE_BACKEND=kms-threshold require "
+            "POS_KMS_TFHE_EVAL_BIN to be set before any KMS/TFHE evaluation call."
+        )
+
+    eval_path = Path(eval_bin).expanduser().resolve()
+    if not eval_path.is_file():
+        raise KmsOracleEvaluatorForbiddenError(
+            f"POS_KMS_TFHE_EVAL_BIN does not exist: {eval_path}"
+        )
+
+    if not os.access(eval_path, os.X_OK):
+        raise KmsOracleEvaluatorForbiddenError(
+            f"POS_KMS_TFHE_EVAL_BIN is not executable: {eval_path}"
+        )
+
+    commands_to_check = [
+        [],
+        ["eval-add"],
+        ["eval-scale-prf"],
+        ["eval-compare"],
+        ["eval-select"],
+        ["eval-locate"],
+        ["eval-locate-bool"],
+    ]
+
+    for subcommand in commands_to_check:
+        result = subprocess.run(
+            [str(eval_path), *subcommand, "--help"],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=20,
+        )
+
+        help_text = result.stdout + "\n" + result.stderr
+
+        if _EXPECTED_ORACLE_PATTERN.search(help_text):
+            command_name = " ".join([eval_path.name, *subcommand, "--help"])
+            raise KmsOracleEvaluatorForbiddenError(
+                "Strict patent mode blocked this KMS/TFHE evaluator because its CLI "
+                "still exposes expected-result / expected-index oracle arguments. "
+                "This evaluator cannot be used as the final TFHE/RLWE patent implementation. "
+                f"Command: {command_name}. Evaluator: {eval_path}"
+            )

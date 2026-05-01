@@ -1,0 +1,38 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/manual_check_stage_h2_real_kms_step0_23.py", line 587, in <module>
+    main()
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/manual_check_stage_h2_real_kms_step0_23.py", line 473, in main
+    decryption_shares_by_chunk = timer.run(
+                                 ^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/manual_check_stage_h2_real_kms_step0_23.py", line 93, in run
+    result = fn()
+             ^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/manual_check_stage_h2_real_kms_step0_23.py", line 475, in <lambda>
+    lambda: step19_generate_decryption_shares(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/protocol/reveal.py", line 112, in step19_generate_decryption_shares
+    share=fhe.decrypt_share(participant_id=participant_id, ciphertext=ct),
+          ^^^^^^^^^^^^^^^^^
+AttributeError: 'KmsThresholdFHEBackend' object has no attribute 'decrypt_share'
+=== Real KMS POS Full Correctness Test: Step0-Step23 ===
+Step0_public_parameter_setup: ok (0.070789s)
+Step1_pedersen_commit: ok (0.087454s)
+Step2_kms_threshold_dkg: ok (1.441122s)
+Step3_seed_generation: ok (0.311425s)
+Step4_kh_prf_share: ok (0.376164s)
+Step5_encrypt_prf_and_opaque_proof: ok (2.260106s)
+Step6_encrypt_stake_and_opaque_proof: ok (2.501461s)
+Step7_ticket_hash_encrypt_suffix_and_opaque_proof: ok (12.849414s)
+Step8_candidate_message_build: ok (0.000030s)
+Step9_verification_seed: ok (0.000027s)
+Step10_cut_and_choose_open_plan: ok (0.000069s)
+Step11_opaque_proof_verify: ok (2.453875s)
+Step12_homomorphic_sum_stakes: ok (0.774569s)
+Step13_14_total_stake_threshold_recover: ok (0.858860s)
+Step15_scaling_ratio: ok (0.000002s)
+Step16_homomorphic_sum_prf: ok (0.974612s)
+Step17_homomorphic_scale_prf: ok (0.740797s)
+Step18_compare_locate_select: ok (12.630859s)
+Step19_ticket_threshold_partial_decrypt: failed (0.000085s)

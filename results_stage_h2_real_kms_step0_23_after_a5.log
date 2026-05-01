@@ -1,0 +1,36 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/manual_check_stage_h2_real_kms_step0_23.py", line 587, in <module>
+    main()
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/manual_check_stage_h2_real_kms_step0_23.py", line 254, in main
+    distributed_key_result = timer.run(
+                             ^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/manual_check_stage_h2_real_kms_step0_23.py", line 93, in run
+    result = fn()
+             ^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/manual_check_stage_h2_real_kms_step0_23.py", line 256, in <lambda>
+    lambda: step2_distributed_generate_keys(pp, participants, threshold),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/protocol/preparation.py", line 59, in step2_distributed_generate_keys
+    result = dkg.distributed_keygen(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/dkg.py", line 171, in distributed_keygen
+    generated_key_material = build_threshold_key_material(
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/thfhe_backend/factory.py", line 118, in build_threshold_key_material
+    return _build_kms_threshold_key_material(participant_ids, threshold)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/thfhe_backend/factory.py", line 77, in _build_kms_threshold_key_material
+    binding = backend.distributed_keygen()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/thfhe_backend/kms_fhe_backend.py", line 211, in distributed_keygen
+    tfhe_params = build_tfhe_trlwe_parameters(
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/patent_tfhe_trlwe.py", line 143, in build_tfhe_trlwe_parameters
+    raise RuntimeError(
+RuntimeError: strict patent KMS TFHE/TRLWE parameters require: POS_KMS_SERVER_KEY_PATH
+=== Real KMS POS Full Correctness Test: Step0-Step23 ===
+Step0_public_parameter_setup: ok (0.072902s)
+Step1_pedersen_commit: ok (0.074590s)
+Step2_kms_threshold_dkg: failed (0.427542s)

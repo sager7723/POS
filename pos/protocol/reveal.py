@@ -4,6 +4,7 @@ import hashlib
 from typing import Dict, List, Optional
 
 from pos.crypto.fhe import FHEThresholdFacade, initialize_fhe_backend
+from pos.crypto.thfhe_backend.kms_eval_oracle_guard import strict_kms_patent_mode_enabled
 from pos.models.common import PublicParameters
 from pos.models.stage2 import Phase2Result
 from pos.models.stage3 import CandidateMessage, Phase3Result, TicketCipherLayout
@@ -41,7 +42,12 @@ def _extract_proof_valid_candidate_ids(
             if is_valid
         )
 
-    # 向后兼容路径；终版主流程应优先传 phase4_result
+    if strict_kms_patent_mode_enabled():
+        raise ValueError(
+            "strict reveal requires proof-valid candidate ids from phase4_result "
+            "or validation_result"
+        )
+
     return sorted(phase3_result.candidate_messages.keys())
 
 
@@ -64,6 +70,8 @@ def _extract_round_id(
         return phase4_result.round_id
     return f"round-{validation_seed[:12]}" if validation_seed else "round-unknown"
 
+
+from pos.protocol.patent_step20 import _ciphertext_from_wire
 
 def _select_public_ticket_layout(
     phase3_result: Phase3Result,
@@ -97,7 +105,7 @@ def step19_generate_decryption_shares(
     """
     shares_by_chunk: Dict[int, List[DecryptionShare]] = {}
     for chunk_index, chunk_ciphertext in enumerate(winning_ticket_ciphertext):
-        ct = fhe.deserialize_ciphertext(chunk_ciphertext)
+        ct = _ciphertext_from_wire(fhe, chunk_ciphertext)
         shares_by_chunk[chunk_index] = [
             DecryptionShare(
                 participant_id=participant_id,
@@ -127,12 +135,14 @@ def step20_recover_ticket_suffix(
     max_value = ticket_layout.chunk_modulus - 1
 
     for chunk_index, chunk_ciphertext in enumerate(winning_ticket_ciphertext):
-        ct = fhe.deserialize_ciphertext(chunk_ciphertext)
+        ct = _ciphertext_from_wire(fhe, chunk_ciphertext)
         share_strings = [item.share for item in decryption_shares_by_chunk[chunk_index]]
         recovered_value = fhe.decrypt(ciphertext=ct, shares=share_strings)
 
         if recovered_value < 0 or recovered_value > max_value:
-            return ""
+            raise ValueError(
+                f"recovered ticket chunk {chunk_index} out of range for public layout"
+            )
 
         recovered_hex_parts.append(f"{recovered_value:0{hex_width}x}")
 
@@ -255,18 +265,6 @@ def step23_verify_winner(
     if recomputed_suffix != recovered_ticket_suffix:
         return False
 
-    matching_candidates = [
-        participant_id
-        for participant_id in proof_valid_candidate_ids
-        if any(
-            artifact.participant.participant_id == participant_id
-            and artifact.ticket_artifact.ticket_hash_suffix == recovered_ticket_suffix
-            for artifact in phase3_result.participant_artifacts
-        )
-    ]
-    if matching_candidates != [winner_id]:
-        return False
-
     if sorted(public_reveal_object.proof_valid_candidate_ids) != sorted(proof_valid_candidate_ids):
         return False
 
@@ -291,6 +289,12 @@ def run_phase5_reveal(
         artifact.participant.participant_id
         for artifact in phase2_result.participant_artifacts
     ]
+
+    if strict_kms_patent_mode_enabled() and phase4_result is None:
+        raise ValueError(
+            "strict reveal requires phase4_result so Step19 decrypts only "
+            "the Step18-selected winning_ticket_ciphertext"
+        )
 
     if phase4_result is not None:
         winning_ticket_ciphertext = phase4_result.winning_ticket_ciphertext

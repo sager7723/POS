@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from pos.crypto.thfhe_backend.kms_eval_oracle_guard import assert_no_expected_oracle_evaluator
+
 import json
+import uuid
+import tempfile
+import subprocess
+import base64
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,7 +56,7 @@ class KmsThresholdCiphertextHandle:
     """
     Opaque ciphertext descriptor used by the PoS project.
 
-    This object intentionally contains no encoded_value and no plaintext debug
+    This object intentionally contains no plaintext debug payload
     field. The ciphertext itself is stored as a KMS-generated ciphertext file.
     """
 
@@ -125,7 +131,7 @@ class KmsThresholdFHEBackend:
     - eval_select
 
     Those must be connected to real TFHE/KMS evaluation APIs later. This file
-    intentionally raises errors instead of using encoded_value, Python one-hot
+    intentionally raises errors instead of using ciphertext debug payloads, Python one-hot
     selection, or any plaintext fallback.
     """
 
@@ -257,6 +263,214 @@ class KmsThresholdFHEBackend:
         self._ensure_kms_ciphertext(ciphertext)
         return self._bridge.public_decrypt_scalar(ciphertext.to_kms_ciphertext())
 
+
+    def _raw_decrypt_work_dir(self) -> Path:
+        cfg = self._bridge.config
+        base = Path(getattr(cfg, "ciphertext_dir", tempfile.gettempdir()))
+        work_dir = base / "pos_raw_threshold_decrypt"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        return work_dir
+
+    def _run_core_client(self, args: list[str]) -> None:
+        cfg = self._bridge.config
+        cmd = [
+            str(cfg.core_client_bin),
+            "-f",
+            str(cfg.core_client_config),
+            *args,
+        ]
+        proc = subprocess.run(
+            cmd,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(
+                "KMS core-client command failed "
+                f"with exit code {proc.returncode}: {' '.join(cmd)}\n"
+                f"stdout:\n{proc.stdout}\n"
+                f"stderr:\n{proc.stderr}"
+            )
+
+    def partial_decrypt(
+        self,
+        participant_id: str,
+        ciphertext: KmsThresholdCiphertextHandle,
+    ) -> str:
+        """
+        Strict Patent Step19.
+
+        Generate raw threshold partial public decrypt shares for exactly this
+        ciphertext handle through KMS. The returned string contains raw share
+        JSON only; it does not contain TypedPlaintext or plaintext_value.
+        """
+        self._ensure_kms_ciphertext(ciphertext)
+
+        cache_key = json.dumps(
+            {
+                "backend": ciphertext.backend,
+                "key_id": ciphertext.key_id,
+                "data_type": ciphertext.data_type,
+                "ciphertext_path": ciphertext.ciphertext_path,
+                "ciphertext_id": ciphertext.ciphertext_id,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+        cache = getattr(self, "_raw_partial_share_cache", None)
+        if cache is None:
+            cache = {}
+            setattr(self, "_raw_partial_share_cache", cache)
+
+        parsed = cache.get(cache_key)
+
+        if parsed is None:
+            work_dir = self._raw_decrypt_work_dir()
+            output_path = work_dir / f"{uuid.uuid4().hex}.raw_partial_shares.json"
+
+            self._run_core_client(
+                [
+                    "pos-raw-partial-public-decrypt-share",
+                    "--input-path",
+                    str(ciphertext.ciphertext_path),
+                    "--output-path",
+                    str(output_path),
+                ]
+            )
+
+            payload = output_path.read_text(encoding="utf-8")
+            lowered = payload.lower()
+            if "typedplaintext" in payload or "plaintext_value" in lowered:
+                raise RuntimeError("KMS raw partial decrypt output contains forbidden plaintext wording")
+
+            parsed = json.loads(payload)
+            if not isinstance(parsed, list) or not parsed:
+                raise RuntimeError("KMS raw partial decrypt output must be a non-empty response list")
+
+            cache[cache_key] = parsed
+
+        return json.dumps(
+            {
+                "kind": "kms_raw_partial_decrypt_response_batch",
+                "participant_id": participant_id,
+                "ciphertext": {
+                    "backend": ciphertext.backend,
+                    "key_id": ciphertext.key_id,
+                    "data_type": ciphertext.data_type,
+                    "ciphertext_path": ciphertext.ciphertext_path,
+                    "ciphertext_id": ciphertext.ciphertext_id,
+                },
+                "responses": parsed,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+    def final_decrypt(
+        self,
+        ciphertext: KmsThresholdCiphertextHandle,
+        shares: Sequence[str],
+    ) -> int:
+        """
+        Strict Patent Step20.
+
+        Combine raw partial decrypt shares through KMS and return the recovered
+        plaintext integer for the selected ciphertext only.
+        """
+        self._ensure_kms_ciphertext(ciphertext)
+
+        responses: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        for item in shares:
+            parsed = json.loads(item)
+
+            if isinstance(parsed, list):
+                candidates = parsed
+            elif isinstance(parsed, dict) and "responses" in parsed:
+                candidates = parsed["responses"]
+            elif isinstance(parsed, dict) and "share" in parsed:
+                candidates = [parsed]
+            else:
+                raise RuntimeError("unsupported KMS raw share JSON shape")
+
+            if not isinstance(candidates, list):
+                raise RuntimeError("KMS raw share responses must be a list")
+
+            for response in candidates:
+                if not isinstance(response, dict) or "share" not in response:
+                    raise RuntimeError("KMS raw share response missing share object")
+                key = json.dumps(response["share"], sort_keys=True, separators=(",", ":"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                responses.append(response)
+
+        if not responses:
+            raise RuntimeError("no KMS raw partial decrypt shares supplied")
+
+        work_dir = self._raw_decrypt_work_dir()
+        shares_path = work_dir / f"{uuid.uuid4().hex}.raw_partial_shares.input.json"
+        output_path = work_dir / f"{uuid.uuid4().hex}.raw_combine_output.json"
+
+        shares_path.write_text(
+            json.dumps(responses, sort_keys=True, separators=(",", ":")),
+            encoding="utf-8",
+        )
+
+        self._run_core_client(
+            [
+                "pos-raw-combine-public-decrypt-shares",
+                "--shares-path",
+                str(shares_path),
+                "--output-path",
+                str(output_path),
+            ]
+        )
+
+        result = json.loads(output_path.read_text(encoding="utf-8"))
+        plaintexts = result.get("plaintexts")
+        if not isinstance(plaintexts, list) or not plaintexts:
+            raise RuntimeError("KMS raw combine output missing plaintexts array")
+
+        first = plaintexts[0]
+        if not isinstance(first, dict) or "bytes" not in first:
+            raise RuntimeError("KMS raw combine plaintext object missing bytes")
+
+        raw_bytes = first["bytes"]
+        if isinstance(raw_bytes, list):
+            value_bytes = bytes(int(x) & 0xFF for x in raw_bytes)
+        elif isinstance(raw_bytes, str):
+            value_bytes = base64.b64decode(raw_bytes)
+        else:
+            raise RuntimeError(f"unsupported KMS plaintext bytes shape: {type(raw_bytes).__name__}")
+
+        if not value_bytes:
+            raise RuntimeError("KMS raw combine returned empty plaintext bytes")
+
+        if ciphertext.data_type == "ebool":
+            return int(value_bytes[0] & 1)
+
+        return int.from_bytes(value_bytes, byteorder="little", signed=False)
+
+    def decrypt_share(
+        self,
+        participant_id: str,
+        ciphertext: KmsThresholdCiphertextHandle,
+    ) -> str:
+        return self.partial_decrypt(participant_id=participant_id, ciphertext=ciphertext)
+
+    def decrypt(
+        self,
+        ciphertext: KmsThresholdCiphertextHandle,
+        shares: Sequence[str],
+    ) -> int:
+        return self.final_decrypt(ciphertext=ciphertext, shares=shares)
+
+
     def homomorphic_add(
         self,
         left: KmsThresholdCiphertextHandle,
@@ -283,9 +497,8 @@ class KmsThresholdFHEBackend:
         self,
         left: KmsThresholdCiphertextHandle,
         right: KmsThresholdCiphertextHandle,
-        *,
-        expected_result: int | None = None,
     ) -> KmsThresholdCiphertextHandle:
+        assert_no_expected_oracle_evaluator()
         self._ensure_kms_ciphertext(left)
         self._ensure_kms_ciphertext(right)
 
@@ -296,18 +509,9 @@ class KmsThresholdFHEBackend:
                 f"left/right data_type mismatch: {left.data_type!r} != {right.data_type!r}"
             )
 
-        if expected_result is None:
-            import os
-
-            expected_result = int(os.environ.get("POS_KMS_EVAL_ADD_EXPECTED_RESULT", "0"))
-
         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge
 
-        return KmsTfheEvalBridge().eval_add(
-            left,
-            right,
-            expected_result=expected_result,
-        )
+        return KmsTfheEvalBridge().eval_add(left, right)
 
     def eval_scale_prf(
         self,
@@ -315,15 +519,16 @@ class KmsThresholdFHEBackend:
         *,
         numerator: int,
         denominator: int,
-        expected_result: int | None = None,
     ) -> KmsThresholdCiphertextHandle:
+        assert_no_expected_oracle_evaluator()
         self._ensure_kms_ciphertext(prf)
 
         if not prf.data_type.startswith("euint"):
             raise ValueError(f"prf must be euint*, got {prf.data_type!r}")
-
-        if expected_result is None:
-            expected_result = (int(os.environ.get("POS_KMS_EVAL_SCALE_PRF_EXPECTED_RESULT", "0")))
+        if int(numerator) < 0:
+            raise ValueError("numerator must be non-negative")
+        if int(denominator) <= 0:
+            raise ValueError("denominator must be positive")
 
         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge
 
@@ -331,40 +536,33 @@ class KmsThresholdFHEBackend:
             prf,
             numerator=int(numerator),
             denominator=int(denominator),
-            expected_result=int(expected_result),
         )
-
 
     def eval_compare(
         self,
         left: KmsThresholdCiphertextHandle,
         right: KmsThresholdCiphertextHandle,
-        *,
-        expected_result: bool | None = None,
     ) -> KmsThresholdCiphertextHandle:
+        assert_no_expected_oracle_evaluator()
         self._ensure_kms_ciphertext(left)
         self._ensure_kms_ciphertext(right)
 
-        if expected_result is None:
-            import os
-
-            expected_text = os.environ.get("POS_KMS_EVAL_COMPARE_EXPECTED_RESULT", "true")
-            expected_result = expected_text.strip().lower() in {"1", "true", "yes", "on"}
+        if not left.data_type.startswith("euint"):
+            raise ValueError(f"left must be euint*, got {left.data_type!r}")
+        if left.data_type != right.data_type:
+            raise ValueError(
+                f"left/right data_type mismatch: {left.data_type!r} != {right.data_type!r}"
+            )
 
         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge
 
-        return KmsTfheEvalBridge().eval_compare(
-            left,
-            right,
-            expected_result=expected_result,
-        )
+        return KmsTfheEvalBridge().eval_compare(left, right)
 
     def eval_locate(
         self,
         values: list[KmsThresholdCiphertextHandle],
-        *,
-        expected_index: int | None = None,
     ) -> list[KmsThresholdCiphertextHandle]:
+        assert_no_expected_oracle_evaluator()
         if not values:
             raise ValueError("eval_locate requires at least one ciphertext")
 
@@ -373,71 +571,51 @@ class KmsThresholdFHEBackend:
             if not value.data_type.startswith("euint"):
                 raise ValueError(f"eval_locate values must be euint*, got {value.data_type!r}")
 
-        if expected_index is None:
-            import os
-
-            expected_index = int(os.environ.get("POS_KMS_EVAL_LOCATE_EXPECTED_INDEX", "0"))
-
         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge
 
-        return KmsTfheEvalBridge().eval_locate(
-            list(values),
-            expected_index=expected_index,
-        )
-
+        return KmsTfheEvalBridge().eval_locate(list(values))
 
     def eval_locate_first_true(
         self,
         flags: list[KmsThresholdCiphertextHandle],
-        *,
-        expected_index: int | None = None,
     ) -> list[KmsThresholdCiphertextHandle]:
+        assert_no_expected_oracle_evaluator()
         if not flags:
             raise ValueError("eval_locate_first_true requires at least one flag")
 
         for flag in flags:
             self._ensure_kms_ciphertext(flag)
             if flag.data_type != "ebool":
-                raise ValueError(f"eval_locate_first_true flags must be ebool, got {flag.data_type!r}")
-
-        if expected_index is None:
-            import os
-
-            expected_index = int(os.environ.get("POS_KMS_EVAL_LOCATE_BOOL_EXPECTED_INDEX", "0"))
+                raise ValueError(
+                    f"eval_locate_first_true flags must be ebool, got {flag.data_type!r}"
+                )
 
         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge
 
-        return KmsTfheEvalBridge().eval_locate_first_true(
-            list(flags),
-            expected_index=expected_index,
-        )
-
+        return KmsTfheEvalBridge().eval_locate_first_true(list(flags))
 
     def eval_select(
         self,
         selector: KmsThresholdCiphertextHandle,
         true_value: KmsThresholdCiphertextHandle,
         false_value: KmsThresholdCiphertextHandle,
-        *,
-        expected_result: int | None = None,
     ) -> KmsThresholdCiphertextHandle:
+        assert_no_expected_oracle_evaluator()
         self._ensure_kms_ciphertext(selector)
         self._ensure_kms_ciphertext(true_value)
         self._ensure_kms_ciphertext(false_value)
 
-        if expected_result is None:
-            import os
-
-            expected_result = int(os.environ.get("POS_KMS_EVAL_SELECT_EXPECTED_RESULT", "0"))
+        if selector.data_type != "ebool":
+            raise ValueError(f"selector must be ebool, got {selector.data_type!r}")
+        if true_value.data_type != false_value.data_type:
+            raise ValueError(
+                "true_value/false_value data_type mismatch: "
+                f"{true_value.data_type!r} != {false_value.data_type!r}"
+            )
 
         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge
 
-        return KmsTfheEvalBridge().eval_select(
-            selector,
-            true_value,
-            false_value,
-            expected_result=expected_result,
-        )
+        return KmsTfheEvalBridge().eval_select(selector, true_value, false_value)
 
     def _ensure_kms_ciphertext(self, ciphertext: KmsThresholdCiphertextHandle) -> None:
         if ciphertext.backend != "kms-threshold":

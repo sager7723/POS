@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="643778ab-2df4-4e63-9637-3b049400f8ab" name="更改" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/PoS.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/main_avg_time_and_winning_rate.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/main_performance_curve.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/manual_check_stage2_compare_select.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/native/kms_tfhe_eval.disabled/Cargo.lock" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/native/kms_tfhe_eval.disabled/Cargo.toml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/native/kms_tfhe_eval.disabled/src/main.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/crypto/dkg.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/crypto/dkg.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/crypto/proofs.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/crypto/proofs.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/crypto/thfhe_backend/kms_eval_bridge.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/crypto/thfhe_backend/kms_eval_bridge.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/crypto/thfhe_backend/kms_fhe_backend.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/crypto/thfhe_backend/kms_fhe_backend.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_a_metadata_free_decrypt.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_b_patent_phase4_no_expected.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_c_kms_ticket_builder.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_c_ticket_chunks_euint8.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_d4_phase3_kms_euint16.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_d5a_phase3_dual_width.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_d5c_kms_dual_width_primitives.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_d5e_proof_gate_diagnostics.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_d_run_phase4_strict_patent.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_e_step20_ticket_recovery.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_f_patent_proof_generator.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage10_g_tfhe_trlwe_parameter_closure.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage4_kms_bridge.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage5_kms_backend.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage6_fhe_entry_kms.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage7_strict_backend_policy.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage8_1_kms_cipher_decode.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage8_2_kms_eval_compare.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage8_3_kms_eval_compare_matrix.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage8_4_kms_eval_select.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage8_5_kms_eval_locate.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage8_small_expanded_ciphertexts.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage9_1_patent_fhe_leader_entry.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage9_2_patent_fhe_protocol_entry.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage9_3_patent_phase4_entry.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage9_4_b2_patent_primitives.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage9_4_c_patent_step18.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage9_4_d_patent_step18_candidates.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage9_4_strict_blocks_legacy_phase4.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage9_5_a_scale_prf.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage9_5_b_patent_complete_phase4.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/manual_check_stage9_5_c_blocks_metadata_dependent_phase4.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/models/stage2.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/models/stage2.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/protocol/candidacy.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/protocol/candidacy.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/protocol/election.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/protocol/election.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/protocol/patent_phase4.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/protocol/patent_phase4.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/protocol/patent_step18.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/protocol/patent_step18.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/protocol/patent_step20.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/protocol/patent_step20.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pos/protocol/reveal.py" beforeDir="false" afterPath="$PROJECT_DIR$/pos/protocol/reveal.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/stages/stage1_main.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stages/stage2_main.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stages/stage3_main.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stages/stage4_main.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stages/stage5_main.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/搭建KMS环境，准备接入POS项目.txt" beforeDir="false" afterPath="$PROJECT_DIR$/搭建KMS环境，准备接入POS项目.txt" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
+  <component name="ProjectId" id="3BTs203KoHFAhVLOpyKAVU0HIqQ" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="1" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.11111.executor&quot;: &quot;Run&quot;,
+    &quot;Python.election.executor&quot;: &quot;Run&quot;,
+    &quot;Python.exp_pwn1.executor&quot;: &quot;Run&quot;,
+    &quot;Python.key_homomorphic_prf.executor&quot;: &quot;Run&quot;,
+    &quot;Python.kms_fhe_backend.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_avg_time_and_winning_rate.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main_performance_curve.executor&quot;: &quot;Run&quot;,
+    &quot;Python.manual_check_stage1_thfhe.executor&quot;: &quot;Run&quot;,
+    &quot;Python.proofs.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage1_main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage2_main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage3.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage3_main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage4_main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.stage5_main.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_stage1.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_stage2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_stage3.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_stage4.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_stage5.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;Errors&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-9c94529fcfe0-JavaScript-PY-252.26199.168" />
+        <option value="bundled-python-sdk-b3d66beaba9a-c6efb3732140-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.26199.168" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="643778ab-2df4-4e63-9637-3b049400f8ab" name="更改" comment="" />
+      <created>1774524183641</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1774524183641</updated>
+      <workItem from="1774524184659" duration="961000" />
+      <workItem from="1774942958016" duration="7362000" />
+      <workItem from="1774953188288" duration="2276000" />
+      <workItem from="1774955493862" duration="1066000" />
+      <workItem from="1774956606497" duration="297000" />
+      <workItem from="1774960613646" duration="1093000" />
+      <workItem from="1775645183139" duration="566000" />
+      <workItem from="1775816706520" duration="213000" />
+      <workItem from="1776214367027" duration="9341000" />
+      <workItem from="1776298068246" duration="4439000" />
+      <workItem from="1776317450277" duration="5360000" />
+      <workItem from="1776336052843" duration="3166000" />
+      <workItem from="1776410556271" duration="12815000" />
+      <workItem from="1777198832338" duration="12870000" />
+      <workItem from="1777259171651" duration="10267000" />
+      <workItem from="1777310128230" duration="17426000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/PoS$proofs.coverage" NAME="proofs 覆盖结果" MODIFIED="1774951422454" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pos/crypto" />
+    <SUITE FILE_PATH="coverage/PoS$test_stage1.coverage" NAME="test_stage1 覆盖结果" MODIFIED="1774947898660" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
+    <SUITE FILE_PATH="coverage/PoS$stage4_main.coverage" NAME="stage4_main 覆盖结果" MODIFIED="1774952307762" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/stages" />
+    <SUITE FILE_PATH="coverage/PoS$stage3.coverage" NAME="stage3 覆盖结果" MODIFIED="1774951369795" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pos/models" />
+    <SUITE FILE_PATH="coverage/PoS$main.coverage" NAME="main 覆盖结果" MODIFIED="1774953199140" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/PoS$exp_pwn1.coverage" NAME="exp_pwn1 覆盖结果" MODIFIED="1777367394012" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$USER_HOME$/Downloads/pwn1" />
+    <SUITE FILE_PATH="coverage/PoS$stage3_main.coverage" NAME="stage3_main 覆盖结果" MODIFIED="1774952224761" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/stages" />
+    <SUITE FILE_PATH="coverage/PoS$test_stage4.coverage" NAME="test_stage4 覆盖结果" MODIFIED="1774952294645" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
+    <SUITE FILE_PATH="coverage/PoS$stage5_main.coverage" NAME="stage5_main 覆盖结果" MODIFIED="1774952539480" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/stages" />
+    <SUITE FILE_PATH="coverage/PoS$key_homomorphic_prf.coverage" NAME="key_homomorphic_prf 覆盖结果" MODIFIED="1774951396245" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pos/crypto" />
+    <SUITE FILE_PATH="coverage/PoS$11111.coverage" NAME="11111 覆盖结果" MODIFIED="1776428334753" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pos" />
+    <SUITE FILE_PATH="coverage/PoS$stage2.coverage" NAME="stage2 覆盖结果" MODIFIED="1774949576173" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pos/models" />
+    <SUITE FILE_PATH="coverage/PoS$stage2_main.coverage" NAME="stage2_main 覆盖结果" MODIFIED="1774951561421" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/stages" />
+    <SUITE FILE_PATH="coverage/PoS$manual_check_stage1_thfhe.coverage" NAME="manual_check_stage1_thfhe 覆盖结果" MODIFIED="1776428383744" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pos" />
+    <SUITE FILE_PATH="coverage/PoS$election.coverage" NAME="election 覆盖结果" MODIFIED="1774952098928" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pos/protocol" />
+    <SUITE FILE_PATH="coverage/PoS$test_stage3.coverage" NAME="test_stage3 覆盖结果" MODIFIED="1774952270534" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
+    <SUITE FILE_PATH="coverage/PoS$kms_fhe_backend.coverage" NAME="kms_fhe_backend 覆盖结果" MODIFIED="1777367382060" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/pos/crypto/thfhe_backend" />
+    <SUITE FILE_PATH="coverage/PoS$test_stage5.coverage" NAME="test_stage5 覆盖结果" MODIFIED="1774952564592" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
+    <SUITE FILE_PATH="coverage/PoS$main_performance_curve.coverage" NAME="main_performance_curve 覆盖结果" MODIFIED="1776319970869" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/PoS$test_stage2.coverage" NAME="test_stage2 覆盖结果" MODIFIED="1774949353870" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tests" />
+    <SUITE FILE_PATH="coverage/PoS$stage1_main.coverage" NAME="stage1_main 覆盖结果" MODIFIED="1774949585734" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/stages" />
+    <SUITE FILE_PATH="coverage/PoS$main_avg_time_and_winning_rate.coverage" NAME="main_avg_time_and_winning_rate 覆盖结果" MODIFIED="1774954239859" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+  </component>
+</project>

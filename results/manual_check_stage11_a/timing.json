@@ -1,0 +1,238 @@
+{
+  "events": [
+    {
+      "metadata": {
+        "manual_check_index": 0
+      },
+      "seconds": 1.571999746374786e-06,
+      "step_name": "Step0_public_parameter_setup"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 1
+      },
+      "seconds": 9.629875421524048e-07,
+      "step_name": "Step1_pedersen_commit"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 2
+      },
+      "seconds": 8.330098353326321e-07,
+      "step_name": "Step2_kms_threshold_key_setup"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 3
+      },
+      "seconds": 2.849992597475648e-07,
+      "step_name": "Step3_seed_generation"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 4
+      },
+      "seconds": 3.1100353226065636e-07,
+      "step_name": "Step4_kh_prf_share"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 5
+      },
+      "seconds": 2.7900387067347765e-07,
+      "step_name": "Step5_encrypt_prf_and_proof"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 6
+      },
+      "seconds": 2.680026227608323e-07,
+      "step_name": "Step6_encrypt_stake_and_proof"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 7
+      },
+      "seconds": 2.749875420704484e-07,
+      "step_name": "Step7_ticket_hash_encrypt_suffix"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 8
+      },
+      "seconds": 2.8799695428460836e-07,
+      "step_name": "Step8_candidate_message_build"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 9
+      },
+      "seconds": 8.400093065574765e-07,
+      "step_name": "Step9_verification_seed"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 10
+      },
+      "seconds": 4.659959813579917e-07,
+      "step_name": "Step10_cut_and_choose_open"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 11
+      },
+      "seconds": 4.80009475722909e-07,
+      "step_name": "Step11_proof_verify"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 12
+      },
+      "seconds": 3.349996404722333e-07,
+      "step_name": "Step12_homomorphic_sum_stakes"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 13
+      },
+      "seconds": 2.8300564736127853e-07,
+      "step_name": "Step13_total_stake_partial_decrypt"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 14
+      },
+      "seconds": 5.76997990719974e-07,
+      "step_name": "Step14_total_stake_recover"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 15
+      },
+      "seconds": 2.390006557106972e-07,
+      "step_name": "Step15_scaling_ratio"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 16
+      },
+      "seconds": 3.3699325285851955e-07,
+      "step_name": "Step16_homomorphic_sum_prf"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 17
+      },
+      "seconds": 2.0599691197276115e-07,
+      "step_name": "Step17_homomorphic_scale_prf"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 18
+      },
+      "seconds": 3.2800016924738884e-07,
+      "step_name": "Step18_compare_locate_select"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 19
+      },
+      "seconds": 8.00995621830225e-07,
+      "step_name": "Step19_ticket_threshold_decrypt"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 20
+      },
+      "seconds": 6.880000000819564e-07,
+      "step_name": "Step20_ticket_suffix_recover"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 21
+      },
+      "seconds": 5.519978003576398e-07,
+      "step_name": "Step21_winner_observe"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 22
+      },
+      "seconds": 4.390021786093712e-07,
+      "step_name": "Step22_winner_reveal"
+    },
+    {
+      "metadata": {
+        "manual_check_index": 23
+      },
+      "seconds": 3.370078047737479e-07,
+      "step_name": "Step23_public_verify"
+    }
+  ],
+  "missing_steps": [],
+  "participant_count": 4,
+  "phase_seconds": {
+    "Phase1_setup": 1.571999746374786e-06,
+    "Phase2_preparation": 2.0809966372326016e-06,
+    "Phase3_candidacy": 1.420994522050023e-06,
+    "Phase4_election": 4.09100903198123e-06,
+    "Phase5_reveal": 2.8170034056529403e-06
+  },
+  "proof_share_count": 8,
+  "run_id": "manual-check-stage11-a",
+  "step_counts": {
+    "Step0_public_parameter_setup": 1,
+    "Step10_cut_and_choose_open": 1,
+    "Step11_proof_verify": 1,
+    "Step12_homomorphic_sum_stakes": 1,
+    "Step13_total_stake_partial_decrypt": 1,
+    "Step14_total_stake_recover": 1,
+    "Step15_scaling_ratio": 1,
+    "Step16_homomorphic_sum_prf": 1,
+    "Step17_homomorphic_scale_prf": 1,
+    "Step18_compare_locate_select": 1,
+    "Step19_ticket_threshold_decrypt": 1,
+    "Step1_pedersen_commit": 1,
+    "Step20_ticket_suffix_recover": 1,
+    "Step21_winner_observe": 1,
+    "Step22_winner_reveal": 1,
+    "Step23_public_verify": 1,
+    "Step2_kms_threshold_key_setup": 1,
+    "Step3_seed_generation": 1,
+    "Step4_kh_prf_share": 1,
+    "Step5_encrypt_prf_and_proof": 1,
+    "Step6_encrypt_stake_and_proof": 1,
+    "Step7_ticket_hash_encrypt_suffix": 1,
+    "Step8_candidate_message_build": 1,
+    "Step9_verification_seed": 1
+  },
+  "step_seconds": {
+    "Step0_public_parameter_setup": 1.571999746374786e-06,
+    "Step10_cut_and_choose_open": 4.659959813579917e-07,
+    "Step11_proof_verify": 4.80009475722909e-07,
+    "Step12_homomorphic_sum_stakes": 3.349996404722333e-07,
+    "Step13_total_stake_partial_decrypt": 2.8300564736127853e-07,
+    "Step14_total_stake_recover": 5.76997990719974e-07,
+    "Step15_scaling_ratio": 2.390006557106972e-07,
+    "Step16_homomorphic_sum_prf": 3.3699325285851955e-07,
+    "Step17_homomorphic_scale_prf": 2.0599691197276115e-07,
+    "Step18_compare_locate_select": 3.2800016924738884e-07,
+    "Step19_ticket_threshold_decrypt": 8.00995621830225e-07,
+    "Step1_pedersen_commit": 9.629875421524048e-07,
+    "Step20_ticket_suffix_recover": 6.880000000819564e-07,
+    "Step21_winner_observe": 5.519978003576398e-07,
+    "Step22_winner_reveal": 4.390021786093712e-07,
+    "Step23_public_verify": 3.370078047737479e-07,
+    "Step2_kms_threshold_key_setup": 8.330098353326321e-07,
+    "Step3_seed_generation": 2.849992597475648e-07,
+    "Step4_kh_prf_share": 3.1100353226065636e-07,
+    "Step5_encrypt_prf_and_proof": 2.7900387067347765e-07,
+    "Step6_encrypt_stake_and_proof": 2.680026227608323e-07,
+    "Step7_ticket_hash_encrypt_suffix": 2.749875420704484e-07,
+    "Step8_candidate_message_build": 2.8799695428460836e-07,
+    "Step9_verification_seed": 8.400093065574765e-07
+  },
+  "strict_kms": true,
+  "threshold": 3,
+  "total_seconds": 1.198200334329158e-05
+}

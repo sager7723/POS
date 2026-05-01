@@ -42,18 +42,27 @@ cargo run --bin kms-server -- --config-file local-threshold-materials/configs/no
 
 cd /mnt/d/biancheng/pycharm/scientific_project/kms
 
-python3 -m http.server 9000 \
-  --bind 127.0.0.1 \
-  --directory local-threshold-materials/client-public
 
 
 
-cd /mnt/d/biancheng/pycharm/scientific_project/kms
-cargo run --bin kms-init -- \
-  -a http://127.0.0.1:50100 \
-     http://127.0.0.1:50200 \
-     http://127.0.0.1:50300 \
-     http://127.0.0.1:50400
+#新release server 启动 4 个节点：
+mkdir -p /tmp/pos_kms_server_logs
+
+target/release/kms-server --config-file local-threshold-materials/configs/node1.toml \
+  > /tmp/pos_kms_server_logs/node1.log 2>&1 &
+
+target/release/kms-server --config-file local-threshold-materials/configs/node2.toml \
+  > /tmp/pos_kms_server_logs/node2.log 2>&1 &
+
+target/release/kms-server --config-file local-threshold-materials/configs/node3.toml \
+  > /tmp/pos_kms_server_logs/node3.log 2>&1 &
+
+target/release/kms-server --config-file local-threshold-materials/configs/node4.toml \
+  > /tmp/pos_kms_server_logs/node4.log 2>&1 &
+
+sleep 5
+
+ps -ef | grep -E 'kms-server' | grep -v grep
 
 
 #清残留

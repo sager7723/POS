@@ -1,0 +1,1934 @@
+{
+  "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/thfhe_backend/kms_eval_bridge.py": {
+    "command_context": [
+      {
+        "content": "00153:                 \"--expected-data-type\",\n00154:                 expected_data_type,\n00155:                 \"--expected-ct-format\",\n00156:                 expected_ct_format,\n00157:             ]\n00158:         )\n00159: \n00160:         return json.loads(stdout)\n00161: \n00162: \n00163:     def eval_add(\n00164:         self,\n00165:         left: KmsThresholdCiphertextHandle,\n00166:         right: KmsThresholdCiphertextHandle,\n00167:         *,\n00168:         expected_result: int,\n00169:     ) -> KmsThresholdCiphertextHandle:\n00170:         self._ensure_ciphertext(left)\n00171:         self._ensure_ciphertext(right)\n00172: \n00173:         data_type = _ensure_same_euint(left, right)",
+        "end": 173,
+        "match_line": 163,
+        "start": 153
+      },
+      {
+        "content": "00208: \n00209:         return KmsThresholdCiphertextHandle(\n00210:             backend=\"kms-threshold\",\n00211:             key_id=self.config.key_id,\n00212:             data_type=data_type,\n00213:             ciphertext_path=str(output_path),\n00214:             ciphertext_id=output_id,\n00215:         )\n00216: \n00217: \n00218:     def eval_scale_prf(\n00219:         self,\n00220:         prf: KmsThresholdCiphertextHandle,\n00221:         *,\n00222:         numerator: int,\n00223:         denominator: int,\n00224:         expected_result: int,\n00225:     ) -> KmsThresholdCiphertextHandle:\n00226:         self._ensure_ciphertext(prf)\n00227: \n00228:         _euint_bits(prf.data_type)",
+        "end": 228,
+        "match_line": 218,
+        "start": 208
+      },
+      {
+        "content": "00269: \n00270:         return KmsThresholdCiphertextHandle(\n00271:             backend=\"kms-threshold\",\n00272:             key_id=self.config.key_id,\n00273:             data_type=prf.data_type,\n00274:             ciphertext_path=str(output_path),\n00275:             ciphertext_id=output_id,\n00276:         )\n00277: \n00278: \n00279:     def eval_compare(\n00280:         self,\n00281:         left: KmsThresholdCiphertextHandle,\n00282:         right: KmsThresholdCiphertextHandle,\n00283:         *,\n00284:         expected_result: bool,\n00285:     ) -> KmsThresholdCiphertextHandle:\n00286:         self._ensure_ciphertext(left)\n00287:         self._ensure_ciphertext(right)\n00288: \n00289:         output_id = uuid.uuid4().hex",
+        "end": 289,
+        "match_line": 279,
+        "start": 269
+      },
+      {
+        "content": "00315:             raise KmsEvalBridgeError(f\"eval-compare did not create output file: {output_path}\")\n00316: \n00317:         return KmsThresholdCiphertextHandle(\n00318:             backend=\"kms-threshold\",\n00319:             key_id=self.config.key_id,\n00320:             data_type=\"ebool\",\n00321:             ciphertext_path=str(output_path),\n00322:             ciphertext_id=output_id,\n00323:         )\n00324: \n00325:     def eval_select(\n00326:         self,\n00327:         selector: KmsThresholdCiphertextHandle,\n00328:         true_value: KmsThresholdCiphertextHandle,\n00329:         false_value: KmsThresholdCiphertextHandle,\n00330:         *,\n00331:         expected_result: int,\n00332:     ) -> KmsThresholdCiphertextHandle:\n00333:         self._ensure_ciphertext(selector)\n00334:         self._ensure_ciphertext(true_value)\n00335:         self._ensure_ciphertext(false_value)",
+        "end": 335,
+        "match_line": 325,
+        "start": 315
+      },
+      {
+        "content": "00382: \n00383:         return KmsThresholdCiphertextHandle(\n00384:             backend=\"kms-threshold\",\n00385:             key_id=self.config.key_id,\n00386:             data_type=data_type,\n00387:             ciphertext_path=str(output_path),\n00388:             ciphertext_id=output_id,\n00389:         )\n00390: \n00391: \n00392:     def eval_locate(\n00393:         self,\n00394:         values: list[KmsThresholdCiphertextHandle],\n00395:         *,\n00396:         expected_index: int,\n00397:     ) -> list[KmsThresholdCiphertextHandle]:\n00398:         if not values:\n00399:             raise KmsEvalBridgeError(\"eval_locate requires at least one ciphertext\")\n00400: \n00401:         if expected_index < 0 or expected_index >= len(values):\n00402:             raise KmsEvalBridgeError(",
+        "end": 402,
+        "match_line": 392,
+        "start": 382
+      },
+      {
+        "content": "00389:         )\n00390: \n00391: \n00392:     def eval_locate(\n00393:         self,\n00394:         values: list[KmsThresholdCiphertextHandle],\n00395:         *,\n00396:         expected_index: int,\n00397:     ) -> list[KmsThresholdCiphertextHandle]:\n00398:         if not values:\n00399:             raise KmsEvalBridgeError(\"eval_locate requires at least one ciphertext\")\n00400: \n00401:         if expected_index < 0 or expected_index >= len(values):\n00402:             raise KmsEvalBridgeError(\n00403:                 f\"expected_index {expected_index} out of range for {len(values)} values\"\n00404:             )\n00405: \n00406:         for idx, value in enumerate(values):\n00407:             self._ensure_ciphertext(value)\n00408:             _euint_bits(value.data_type)\n00409: ",
+        "end": 409,
+        "match_line": 399,
+        "start": 389
+      },
+      {
+        "content": "00451:                     key_id=self.config.key_id,\n00452:                     data_type=\"ebool\",\n00453:                     ciphertext_path=str(output_path),\n00454:                     ciphertext_id=f\"{output_id}_onehot_{idx:02}\",\n00455:                 )\n00456:             )\n00457: \n00458:         return handles\n00459: \n00460: \n00461:     def eval_locate_first_true(\n00462:         self,\n00463:         flags: list[KmsThresholdCiphertextHandle],\n00464:         *,\n00465:         expected_index: int,\n00466:     ) -> list[KmsThresholdCiphertextHandle]:\n00467:         if not flags:\n00468:             raise KmsEvalBridgeError(\"eval_locate_first_true requires at least one flag\")\n00469: \n00470:         if expected_index < 0 or expected_index >= len(flags):\n00471:             raise KmsEvalBridgeError(",
+        "end": 471,
+        "match_line": 461,
+        "start": 451
+      },
+      {
+        "content": "00458:         return handles\n00459: \n00460: \n00461:     def eval_locate_first_true(\n00462:         self,\n00463:         flags: list[KmsThresholdCiphertextHandle],\n00464:         *,\n00465:         expected_index: int,\n00466:     ) -> list[KmsThresholdCiphertextHandle]:\n00467:         if not flags:\n00468:             raise KmsEvalBridgeError(\"eval_locate_first_true requires at least one flag\")\n00469: \n00470:         if expected_index < 0 or expected_index >= len(flags):\n00471:             raise KmsEvalBridgeError(\n00472:                 f\"expected_index {expected_index} out of range for {len(flags)} flags\"\n00473:             )\n00474: \n00475:         for idx, flag in enumerate(flags):\n00476:             self._ensure_ciphertext(flag)\n00477:             if flag.data_type != \"ebool\":\n00478:                 raise KmsEvalBridgeError(f\"flag[{idx}] must be ebool, got {flag.data_type!r}\")",
+        "end": 478,
+        "match_line": 468,
+        "start": 458
+      }
+    ],
+    "expected_context": [
+      {
+        "content": "00162: \n00163:     def eval_add(\n00164:         self,\n00165:         left: KmsThresholdCiphertextHandle,\n00166:         right: KmsThresholdCiphertextHandle,\n00167:         *,\n00168:         expected_result: int,\n00169:     ) -> KmsThresholdCiphertextHandle:\n00170:         self._ensure_ciphertext(left)\n00171:         self._ensure_ciphertext(right)\n00172: \n00173:         data_type = _ensure_same_euint(left, right)\n00174:         modulus = _euint_modulus(data_type)",
+        "end": 174,
+        "match_line": 168,
+        "start": 162
+      },
+      {
+        "content": "00170:         self._ensure_ciphertext(left)\n00171:         self._ensure_ciphertext(right)\n00172: \n00173:         data_type = _ensure_same_euint(left, right)\n00174:         modulus = _euint_modulus(data_type)\n00175: \n00176:         if expected_result < 0 or expected_result >= modulus:\n00177:             raise KmsEvalBridgeError(\n00178:                 f\"expected_result must fit {data_type}, got {expected_result}\"\n00179:             )\n00180: \n00181:         output_id = uuid.uuid4().hex\n00182:         output_path = self.config.ciphertext_dir / f\"{output_id}.{data_type}.ct\"",
+        "end": 182,
+        "match_line": 176,
+        "start": 170
+      },
+      {
+        "content": "00172: \n00173:         data_type = _ensure_same_euint(left, right)\n00174:         modulus = _euint_modulus(data_type)\n00175: \n00176:         if expected_result < 0 or expected_result >= modulus:\n00177:             raise KmsEvalBridgeError(\n00178:                 f\"expected_result must fit {data_type}, got {expected_result}\"\n00179:             )\n00180: \n00181:         output_id = uuid.uuid4().hex\n00182:         output_path = self.config.ciphertext_dir / f\"{output_id}.{data_type}.ct\"\n00183: \n00184:         stdout = self._run(",
+        "end": 184,
+        "match_line": 178,
+        "start": 172
+      },
+      {
+        "content": "00191:                 \"--server-key\",\n00192:                 str(self.config.server_key_path),\n00193:                 \"--output\",\n00194:                 str(output_path),\n00195:                 \"--expected-key-id\",\n00196:                 self.config.key_id,\n00197:                 \"--expected-result\",\n00198:                 str(expected_result),\n00199:             ]\n00200:         )\n00201: \n00202:         report = json.loads(stdout)\n00203:         if report.get(\"ok\") is not True:",
+        "end": 203,
+        "match_line": 197,
+        "start": 191
+      },
+      {
+        "content": "00192:                 str(self.config.server_key_path),\n00193:                 \"--output\",\n00194:                 str(output_path),\n00195:                 \"--expected-key-id\",\n00196:                 self.config.key_id,\n00197:                 \"--expected-result\",\n00198:                 str(expected_result),\n00199:             ]\n00200:         )\n00201: \n00202:         report = json.loads(stdout)\n00203:         if report.get(\"ok\") is not True:\n00204:             raise KmsEvalBridgeError(f\"eval-add did not return ok=true: {report}\")",
+        "end": 204,
+        "match_line": 198,
+        "start": 192
+      },
+      {
+        "content": "00218:     def eval_scale_prf(\n00219:         self,\n00220:         prf: KmsThresholdCiphertextHandle,\n00221:         *,\n00222:         numerator: int,\n00223:         denominator: int,\n00224:         expected_result: int,\n00225:     ) -> KmsThresholdCiphertextHandle:\n00226:         self._ensure_ciphertext(prf)\n00227: \n00228:         _euint_bits(prf.data_type)\n00229:         modulus = _euint_modulus(prf.data_type)\n00230: ",
+        "end": 230,
+        "match_line": 224,
+        "start": 218
+      },
+      {
+        "content": "00229:         modulus = _euint_modulus(prf.data_type)\n00230: \n00231:         if numerator < 0:\n00232:             raise KmsEvalBridgeError(f\"numerator must be non-negative, got {numerator}\")\n00233:         if denominator <= 0:\n00234:             raise KmsEvalBridgeError(f\"denominator must be positive, got {denominator}\")\n00235:         if expected_result < 0 or expected_result >= modulus:\n00236:             raise KmsEvalBridgeError(\n00237:                 f\"expected_result must fit {prf.data_type}, got {expected_result}\"\n00238:             )\n00239: \n00240:         output_id = uuid.uuid4().hex\n00241:         output_path = self.config.ciphertext_dir / f\"{output_id}.{prf.data_type}.ct\"",
+        "end": 241,
+        "match_line": 235,
+        "start": 229
+      },
+      {
+        "content": "00231:         if numerator < 0:\n00232:             raise KmsEvalBridgeError(f\"numerator must be non-negative, got {numerator}\")\n00233:         if denominator <= 0:\n00234:             raise KmsEvalBridgeError(f\"denominator must be positive, got {denominator}\")\n00235:         if expected_result < 0 or expected_result >= modulus:\n00236:             raise KmsEvalBridgeError(\n00237:                 f\"expected_result must fit {prf.data_type}, got {expected_result}\"\n00238:             )\n00239: \n00240:         output_id = uuid.uuid4().hex\n00241:         output_path = self.config.ciphertext_dir / f\"{output_id}.{prf.data_type}.ct\"\n00242: \n00243:         stdout = self._run(",
+        "end": 243,
+        "match_line": 237,
+        "start": 231
+      },
+      {
+        "content": "00252:                 \"--expected-key-id\",\n00253:                 self.config.key_id,\n00254:                 \"--numerator\",\n00255:                 str(numerator),\n00256:                 \"--denominator\",\n00257:                 str(denominator),\n00258:                 \"--expected-result\",\n00259:                 str(expected_result),\n00260:             ]\n00261:         )\n00262: \n00263:         report = json.loads(stdout)\n00264:         if report.get(\"ok\") is not True:",
+        "end": 264,
+        "match_line": 258,
+        "start": 252
+      },
+      {
+        "content": "00253:                 self.config.key_id,\n00254:                 \"--numerator\",\n00255:                 str(numerator),\n00256:                 \"--denominator\",\n00257:                 str(denominator),\n00258:                 \"--expected-result\",\n00259:                 str(expected_result),\n00260:             ]\n00261:         )\n00262: \n00263:         report = json.loads(stdout)\n00264:         if report.get(\"ok\") is not True:\n00265:             raise KmsEvalBridgeError(f\"eval-scale-prf did not return ok=true: {report}\")",
+        "end": 265,
+        "match_line": 259,
+        "start": 253
+      },
+      {
+        "content": "00278: \n00279:     def eval_compare(\n00280:         self,\n00281:         left: KmsThresholdCiphertextHandle,\n00282:         right: KmsThresholdCiphertextHandle,\n00283:         *,\n00284:         expected_result: bool,\n00285:     ) -> KmsThresholdCiphertextHandle:\n00286:         self._ensure_ciphertext(left)\n00287:         self._ensure_ciphertext(right)\n00288: \n00289:         output_id = uuid.uuid4().hex\n00290:         output_path = self.config.ciphertext_dir / f\"{output_id}.ebool.ct\"",
+        "end": 290,
+        "match_line": 284,
+        "start": 278
+      },
+      {
+        "content": "00299:                 \"--server-key\",\n00300:                 str(self.config.server_key_path),\n00301:                 \"--output\",\n00302:                 str(output_path),\n00303:                 \"--expected-key-id\",\n00304:                 self.config.key_id,\n00305:                 \"--expected-result\",\n00306:                 \"true\" if expected_result else \"false\",\n00307:             ]\n00308:         )\n00309: \n00310:         report = json.loads(stdout)\n00311:         if report.get(\"ok\") is not True:",
+        "end": 311,
+        "match_line": 305,
+        "start": 299
+      },
+      {
+        "content": "00300:                 str(self.config.server_key_path),\n00301:                 \"--output\",\n00302:                 str(output_path),\n00303:                 \"--expected-key-id\",\n00304:                 self.config.key_id,\n00305:                 \"--expected-result\",\n00306:                 \"true\" if expected_result else \"false\",\n00307:             ]\n00308:         )\n00309: \n00310:         report = json.loads(stdout)\n00311:         if report.get(\"ok\") is not True:\n00312:             raise KmsEvalBridgeError(f\"eval-compare did not return ok=true: {report}\")",
+        "end": 312,
+        "match_line": 306,
+        "start": 300
+      },
+      {
+        "content": "00325:     def eval_select(\n00326:         self,\n00327:         selector: KmsThresholdCiphertextHandle,\n00328:         true_value: KmsThresholdCiphertextHandle,\n00329:         false_value: KmsThresholdCiphertextHandle,\n00330:         *,\n00331:         expected_result: int,\n00332:     ) -> KmsThresholdCiphertextHandle:\n00333:         self._ensure_ciphertext(selector)\n00334:         self._ensure_ciphertext(true_value)\n00335:         self._ensure_ciphertext(false_value)\n00336: \n00337:         if selector.data_type != \"ebool\":",
+        "end": 337,
+        "match_line": 331,
+        "start": 325
+      },
+      {
+        "content": "00342:             false_value,\n00343:             left_label=\"true_value\",\n00344:             right_label=\"false_value\",\n00345:         )\n00346:         modulus = _euint_modulus(data_type)\n00347: \n00348:         if expected_result < 0 or expected_result >= modulus:\n00349:             raise KmsEvalBridgeError(\n00350:                 f\"expected_result must fit {data_type}, got {expected_result}\"\n00351:             )\n00352: \n00353:         output_id = uuid.uuid4().hex\n00354:         output_path = self.config.ciphertext_dir / f\"{output_id}.{data_type}.ct\"",
+        "end": 354,
+        "match_line": 348,
+        "start": 342
+      },
+      {
+        "content": "00344:             right_label=\"false_value\",\n00345:         )\n00346:         modulus = _euint_modulus(data_type)\n00347: \n00348:         if expected_result < 0 or expected_result >= modulus:\n00349:             raise KmsEvalBridgeError(\n00350:                 f\"expected_result must fit {data_type}, got {expected_result}\"\n00351:             )\n00352: \n00353:         output_id = uuid.uuid4().hex\n00354:         output_path = self.config.ciphertext_dir / f\"{output_id}.{data_type}.ct\"\n00355: \n00356:         stdout = self._run(",
+        "end": 356,
+        "match_line": 350,
+        "start": 344
+      },
+      {
+        "content": "00365:                 \"--server-key\",\n00366:                 str(self.config.server_key_path),\n00367:                 \"--output\",\n00368:                 str(output_path),\n00369:                 \"--expected-key-id\",\n00370:                 self.config.key_id,\n00371:                 \"--expected-result\",\n00372:                 str(expected_result),\n00373:             ]\n00374:         )\n00375: \n00376:         report = json.loads(stdout)\n00377:         if report.get(\"ok\") is not True:",
+        "end": 377,
+        "match_line": 371,
+        "start": 365
+      },
+      {
+        "content": "00366:                 str(self.config.server_key_path),\n00367:                 \"--output\",\n00368:                 str(output_path),\n00369:                 \"--expected-key-id\",\n00370:                 self.config.key_id,\n00371:                 \"--expected-result\",\n00372:                 str(expected_result),\n00373:             ]\n00374:         )\n00375: \n00376:         report = json.loads(stdout)\n00377:         if report.get(\"ok\") is not True:\n00378:             raise KmsEvalBridgeError(f\"eval-select did not return ok=true: {report}\")",
+        "end": 378,
+        "match_line": 372,
+        "start": 366
+      },
+      {
+        "content": "00390: \n00391: \n00392:     def eval_locate(\n00393:         self,\n00394:         values: list[KmsThresholdCiphertextHandle],\n00395:         *,\n00396:         expected_index: int,\n00397:     ) -> list[KmsThresholdCiphertextHandle]:\n00398:         if not values:\n00399:             raise KmsEvalBridgeError(\"eval_locate requires at least one ciphertext\")\n00400: \n00401:         if expected_index < 0 or expected_index >= len(values):\n00402:             raise KmsEvalBridgeError(",
+        "end": 402,
+        "match_line": 396,
+        "start": 390
+      },
+      {
+        "content": "00395:         *,\n00396:         expected_index: int,\n00397:     ) -> list[KmsThresholdCiphertextHandle]:\n00398:         if not values:\n00399:             raise KmsEvalBridgeError(\"eval_locate requires at least one ciphertext\")\n00400: \n00401:         if expected_index < 0 or expected_index >= len(values):\n00402:             raise KmsEvalBridgeError(\n00403:                 f\"expected_index {expected_index} out of range for {len(values)} values\"\n00404:             )\n00405: \n00406:         for idx, value in enumerate(values):\n00407:             self._ensure_ciphertext(value)",
+        "end": 407,
+        "match_line": 401,
+        "start": 395
+      },
+      {
+        "content": "00397:     ) -> list[KmsThresholdCiphertextHandle]:\n00398:         if not values:\n00399:             raise KmsEvalBridgeError(\"eval_locate requires at least one ciphertext\")\n00400: \n00401:         if expected_index < 0 or expected_index >= len(values):\n00402:             raise KmsEvalBridgeError(\n00403:                 f\"expected_index {expected_index} out of range for {len(values)} values\"\n00404:             )\n00405: \n00406:         for idx, value in enumerate(values):\n00407:             self._ensure_ciphertext(value)\n00408:             _euint_bits(value.data_type)\n00409: ",
+        "end": 409,
+        "match_line": 403,
+        "start": 397
+      },
+      {
+        "content": "00421:                 \"--server-key\",\n00422:                 str(self.config.server_key_path),\n00423:                 \"--output-dir\",\n00424:                 str(output_dir),\n00425:                 \"--expected-key-id\",\n00426:                 self.config.key_id,\n00427:                 \"--expected-index\",\n00428:                 str(expected_index),\n00429:             ]\n00430:         )\n00431: \n00432:         stdout = self._run(command_args)\n00433:         report = json.loads(stdout)",
+        "end": 433,
+        "match_line": 427,
+        "start": 421
+      },
+      {
+        "content": "00422:                 str(self.config.server_key_path),\n00423:                 \"--output-dir\",\n00424:                 str(output_dir),\n00425:                 \"--expected-key-id\",\n00426:                 self.config.key_id,\n00427:                 \"--expected-index\",\n00428:                 str(expected_index),\n00429:             ]\n00430:         )\n00431: \n00432:         stdout = self._run(command_args)\n00433:         report = json.loads(stdout)\n00434: ",
+        "end": 434,
+        "match_line": 428,
+        "start": 422
+      },
+      {
+        "content": "00459: \n00460: \n00461:     def eval_locate_first_true(\n00462:         self,\n00463:         flags: list[KmsThresholdCiphertextHandle],\n00464:         *,\n00465:         expected_index: int,\n00466:     ) -> list[KmsThresholdCiphertextHandle]:\n00467:         if not flags:\n00468:             raise KmsEvalBridgeError(\"eval_locate_first_true requires at least one flag\")\n00469: \n00470:         if expected_index < 0 or expected_index >= len(flags):\n00471:             raise KmsEvalBridgeError(",
+        "end": 471,
+        "match_line": 465,
+        "start": 459
+      },
+      {
+        "content": "00464:         *,\n00465:         expected_index: int,\n00466:     ) -> list[KmsThresholdCiphertextHandle]:\n00467:         if not flags:\n00468:             raise KmsEvalBridgeError(\"eval_locate_first_true requires at least one flag\")\n00469: \n00470:         if expected_index < 0 or expected_index >= len(flags):\n00471:             raise KmsEvalBridgeError(\n00472:                 f\"expected_index {expected_index} out of range for {len(flags)} flags\"\n00473:             )\n00474: \n00475:         for idx, flag in enumerate(flags):\n00476:             self._ensure_ciphertext(flag)",
+        "end": 476,
+        "match_line": 470,
+        "start": 464
+      },
+      {
+        "content": "00466:     ) -> list[KmsThresholdCiphertextHandle]:\n00467:         if not flags:\n00468:             raise KmsEvalBridgeError(\"eval_locate_first_true requires at least one flag\")\n00469: \n00470:         if expected_index < 0 or expected_index >= len(flags):\n00471:             raise KmsEvalBridgeError(\n00472:                 f\"expected_index {expected_index} out of range for {len(flags)} flags\"\n00473:             )\n00474: \n00475:         for idx, flag in enumerate(flags):\n00476:             self._ensure_ciphertext(flag)\n00477:             if flag.data_type != \"ebool\":\n00478:                 raise KmsEvalBridgeError(f\"flag[{idx}] must be ebool, got {flag.data_type!r}\")",
+        "end": 478,
+        "match_line": 472,
+        "start": 466
+      },
+      {
+        "content": "00491:                 \"--server-key\",\n00492:                 str(self.config.server_key_path),\n00493:                 \"--output-dir\",\n00494:                 str(output_dir),\n00495:                 \"--expected-key-id\",\n00496:                 self.config.key_id,\n00497:                 \"--expected-index\",\n00498:                 str(expected_index),\n00499:             ]\n00500:         )\n00501: \n00502:         stdout = self._run(command_args)\n00503:         report = json.loads(stdout)",
+        "end": 503,
+        "match_line": 497,
+        "start": 491
+      },
+      {
+        "content": "00492:                 str(self.config.server_key_path),\n00493:                 \"--output-dir\",\n00494:                 str(output_dir),\n00495:                 \"--expected-key-id\",\n00496:                 self.config.key_id,\n00497:                 \"--expected-index\",\n00498:                 str(expected_index),\n00499:             ]\n00500:         )\n00501: \n00502:         stdout = self._run(command_args)\n00503:         report = json.loads(stdout)\n00504: ",
+        "end": 504,
+        "match_line": 498,
+        "start": 492
+      }
+    ],
+    "expected_matches": [
+      {
+        "line": 168,
+        "text": "        expected_result: int,"
+      },
+      {
+        "line": 176,
+        "text": "        if expected_result < 0 or expected_result >= modulus:"
+      },
+      {
+        "line": 178,
+        "text": "                f\"expected_result must fit {data_type}, got {expected_result}\""
+      },
+      {
+        "line": 197,
+        "text": "                \"--expected-result\","
+      },
+      {
+        "line": 198,
+        "text": "                str(expected_result),"
+      },
+      {
+        "line": 224,
+        "text": "        expected_result: int,"
+      },
+      {
+        "line": 235,
+        "text": "        if expected_result < 0 or expected_result >= modulus:"
+      },
+      {
+        "line": 237,
+        "text": "                f\"expected_result must fit {prf.data_type}, got {expected_result}\""
+      },
+      {
+        "line": 258,
+        "text": "                \"--expected-result\","
+      },
+      {
+        "line": 259,
+        "text": "                str(expected_result),"
+      },
+      {
+        "line": 284,
+        "text": "        expected_result: bool,"
+      },
+      {
+        "line": 305,
+        "text": "                \"--expected-result\","
+      },
+      {
+        "line": 306,
+        "text": "                \"true\" if expected_result else \"false\","
+      },
+      {
+        "line": 331,
+        "text": "        expected_result: int,"
+      },
+      {
+        "line": 348,
+        "text": "        if expected_result < 0 or expected_result >= modulus:"
+      },
+      {
+        "line": 350,
+        "text": "                f\"expected_result must fit {data_type}, got {expected_result}\""
+      },
+      {
+        "line": 371,
+        "text": "                \"--expected-result\","
+      },
+      {
+        "line": 372,
+        "text": "                str(expected_result),"
+      },
+      {
+        "line": 396,
+        "text": "        expected_index: int,"
+      },
+      {
+        "line": 401,
+        "text": "        if expected_index < 0 or expected_index >= len(values):"
+      },
+      {
+        "line": 403,
+        "text": "                f\"expected_index {expected_index} out of range for {len(values)} values\""
+      },
+      {
+        "line": 427,
+        "text": "                \"--expected-index\","
+      },
+      {
+        "line": 428,
+        "text": "                str(expected_index),"
+      },
+      {
+        "line": 465,
+        "text": "        expected_index: int,"
+      },
+      {
+        "line": 470,
+        "text": "        if expected_index < 0 or expected_index >= len(flags):"
+      },
+      {
+        "line": 472,
+        "text": "                f\"expected_index {expected_index} out of range for {len(flags)} flags\""
+      },
+      {
+        "line": 497,
+        "text": "                \"--expected-index\","
+      },
+      {
+        "line": 498,
+        "text": "                str(expected_index),"
+      }
+    ]
+  },
+  "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/thfhe_backend/kms_fhe_backend.py": {
+    "command_context": [
+      {
+        "content": "00113:     Implemented now:\n00114:     - setup\n00115:     - distributed_keygen binding to an already generated KMS key_id\n00116:     - encrypt_scalar via KMS PublicKey\n00117:     - user_decrypt_scalar via KMS threshold user-decrypt\n00118:     - public_decrypt_scalar via KMS threshold public-decrypt\n00119: \n00120:     Not implemented here by design:\n00121:     - homomorphic_add\n00122:     - homomorphic_sum\n00123:     - eval_compare\n00124:     - eval_locate\n00125:     - eval_select\n00126: \n00127:     Those must be connected to real TFHE/KMS evaluation APIs later. This file\n00128:     intentionally raises errors instead of using encoded_value, Python one-hot\n00129:     selection, or any plaintext fallback.\n00130:     \"\"\"\n00131: \n00132:     backend_name = \"kms-threshold\"\n00133: ",
+        "end": 133,
+        "match_line": 123,
+        "start": 113
+      },
+      {
+        "content": "00114:     - setup\n00115:     - distributed_keygen binding to an already generated KMS key_id\n00116:     - encrypt_scalar via KMS PublicKey\n00117:     - user_decrypt_scalar via KMS threshold user-decrypt\n00118:     - public_decrypt_scalar via KMS threshold public-decrypt\n00119: \n00120:     Not implemented here by design:\n00121:     - homomorphic_add\n00122:     - homomorphic_sum\n00123:     - eval_compare\n00124:     - eval_locate\n00125:     - eval_select\n00126: \n00127:     Those must be connected to real TFHE/KMS evaluation APIs later. This file\n00128:     intentionally raises errors instead of using encoded_value, Python one-hot\n00129:     selection, or any plaintext fallback.\n00130:     \"\"\"\n00131: \n00132:     backend_name = \"kms-threshold\"\n00133: \n00134:     def __init__(",
+        "end": 134,
+        "match_line": 124,
+        "start": 114
+      },
+      {
+        "content": "00115:     - distributed_keygen binding to an already generated KMS key_id\n00116:     - encrypt_scalar via KMS PublicKey\n00117:     - user_decrypt_scalar via KMS threshold user-decrypt\n00118:     - public_decrypt_scalar via KMS threshold public-decrypt\n00119: \n00120:     Not implemented here by design:\n00121:     - homomorphic_add\n00122:     - homomorphic_sum\n00123:     - eval_compare\n00124:     - eval_locate\n00125:     - eval_select\n00126: \n00127:     Those must be connected to real TFHE/KMS evaluation APIs later. This file\n00128:     intentionally raises errors instead of using encoded_value, Python one-hot\n00129:     selection, or any plaintext fallback.\n00130:     \"\"\"\n00131: \n00132:     backend_name = \"kms-threshold\"\n00133: \n00134:     def __init__(\n00135:         self,",
+        "end": 135,
+        "match_line": 125,
+        "start": 115
+      },
+      {
+        "content": "00272:         self,\n00273:         ciphertexts: Sequence[KmsThresholdCiphertextHandle],\n00274:     ) -> KmsThresholdCiphertextHandle:\n00275:         raise NotImplementedError(\n00276:             \"homomorphic_sum is intentionally disabled for kms-threshold until \"\n00277:             \"a real KMS/TFHE homomorphic evaluation API is connected. \"\n00278:             \"No plaintext fallback is allowed.\"\n00279:         )\n00280: \n00281: \n00282:     def eval_add(\n00283:         self,\n00284:         left: KmsThresholdCiphertextHandle,\n00285:         right: KmsThresholdCiphertextHandle,\n00286:         *,\n00287:         expected_result: int | None = None,\n00288:     ) -> KmsThresholdCiphertextHandle:\n00289:         self._ensure_kms_ciphertext(left)\n00290:         self._ensure_kms_ciphertext(right)\n00291: \n00292:         if not left.data_type.startswith(\"euint\"):",
+        "end": 292,
+        "match_line": 282,
+        "start": 272
+      },
+      {
+        "content": "00296:                 f\"left/right data_type mismatch: {left.data_type!r} != {right.data_type!r}\"\n00297:             )\n00298: \n00299:         if expected_result is None:\n00300:             import os\n00301: \n00302:             expected_result = int(os.environ.get(\"POS_KMS_EVAL_ADD_EXPECTED_RESULT\", \"0\"))\n00303: \n00304:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00305: \n00306:         return KmsTfheEvalBridge().eval_add(\n00307:             left,\n00308:             right,\n00309:             expected_result=expected_result,\n00310:         )\n00311: \n00312:     def eval_scale_prf(\n00313:         self,\n00314:         prf: KmsThresholdCiphertextHandle,\n00315:         *,\n00316:         numerator: int,",
+        "end": 316,
+        "match_line": 306,
+        "start": 296
+      },
+      {
+        "content": "00302:             expected_result = int(os.environ.get(\"POS_KMS_EVAL_ADD_EXPECTED_RESULT\", \"0\"))\n00303: \n00304:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00305: \n00306:         return KmsTfheEvalBridge().eval_add(\n00307:             left,\n00308:             right,\n00309:             expected_result=expected_result,\n00310:         )\n00311: \n00312:     def eval_scale_prf(\n00313:         self,\n00314:         prf: KmsThresholdCiphertextHandle,\n00315:         *,\n00316:         numerator: int,\n00317:         denominator: int,\n00318:         expected_result: int | None = None,\n00319:     ) -> KmsThresholdCiphertextHandle:\n00320:         self._ensure_kms_ciphertext(prf)\n00321: \n00322:         if not prf.data_type.startswith(\"euint\"):",
+        "end": 322,
+        "match_line": 312,
+        "start": 302
+      },
+      {
+        "content": "00320:         self._ensure_kms_ciphertext(prf)\n00321: \n00322:         if not prf.data_type.startswith(\"euint\"):\n00323:             raise ValueError(f\"prf must be euint*, got {prf.data_type!r}\")\n00324: \n00325:         if expected_result is None:\n00326:             expected_result = (int(os.environ.get(\"POS_KMS_EVAL_SCALE_PRF_EXPECTED_RESULT\", \"0\")))\n00327: \n00328:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00329: \n00330:         return KmsTfheEvalBridge().eval_scale_prf(\n00331:             prf,\n00332:             numerator=int(numerator),\n00333:             denominator=int(denominator),\n00334:             expected_result=int(expected_result),\n00335:         )\n00336: \n00337: \n00338:     def eval_compare(\n00339:         self,\n00340:         left: KmsThresholdCiphertextHandle,",
+        "end": 340,
+        "match_line": 330,
+        "start": 320
+      },
+      {
+        "content": "00328:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00329: \n00330:         return KmsTfheEvalBridge().eval_scale_prf(\n00331:             prf,\n00332:             numerator=int(numerator),\n00333:             denominator=int(denominator),\n00334:             expected_result=int(expected_result),\n00335:         )\n00336: \n00337: \n00338:     def eval_compare(\n00339:         self,\n00340:         left: KmsThresholdCiphertextHandle,\n00341:         right: KmsThresholdCiphertextHandle,\n00342:         *,\n00343:         expected_result: bool | None = None,\n00344:     ) -> KmsThresholdCiphertextHandle:\n00345:         self._ensure_kms_ciphertext(left)\n00346:         self._ensure_kms_ciphertext(right)\n00347: \n00348:         if expected_result is None:",
+        "end": 348,
+        "match_line": 338,
+        "start": 328
+      },
+      {
+        "content": "00346:         self._ensure_kms_ciphertext(right)\n00347: \n00348:         if expected_result is None:\n00349:             import os\n00350: \n00351:             expected_text = os.environ.get(\"POS_KMS_EVAL_COMPARE_EXPECTED_RESULT\", \"true\")\n00352:             expected_result = expected_text.strip().lower() in {\"1\", \"true\", \"yes\", \"on\"}\n00353: \n00354:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00355: \n00356:         return KmsTfheEvalBridge().eval_compare(\n00357:             left,\n00358:             right,\n00359:             expected_result=expected_result,\n00360:         )\n00361: \n00362:     def eval_locate(\n00363:         self,\n00364:         values: list[KmsThresholdCiphertextHandle],\n00365:         *,\n00366:         expected_index: int | None = None,",
+        "end": 366,
+        "match_line": 356,
+        "start": 346
+      },
+      {
+        "content": "00352:             expected_result = expected_text.strip().lower() in {\"1\", \"true\", \"yes\", \"on\"}\n00353: \n00354:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00355: \n00356:         return KmsTfheEvalBridge().eval_compare(\n00357:             left,\n00358:             right,\n00359:             expected_result=expected_result,\n00360:         )\n00361: \n00362:     def eval_locate(\n00363:         self,\n00364:         values: list[KmsThresholdCiphertextHandle],\n00365:         *,\n00366:         expected_index: int | None = None,\n00367:     ) -> list[KmsThresholdCiphertextHandle]:\n00368:         if not values:\n00369:             raise ValueError(\"eval_locate requires at least one ciphertext\")\n00370: \n00371:         for value in values:\n00372:             self._ensure_kms_ciphertext(value)",
+        "end": 372,
+        "match_line": 362,
+        "start": 352
+      },
+      {
+        "content": "00359:             expected_result=expected_result,\n00360:         )\n00361: \n00362:     def eval_locate(\n00363:         self,\n00364:         values: list[KmsThresholdCiphertextHandle],\n00365:         *,\n00366:         expected_index: int | None = None,\n00367:     ) -> list[KmsThresholdCiphertextHandle]:\n00368:         if not values:\n00369:             raise ValueError(\"eval_locate requires at least one ciphertext\")\n00370: \n00371:         for value in values:\n00372:             self._ensure_kms_ciphertext(value)\n00373:             if not value.data_type.startswith(\"euint\"):\n00374:                 raise ValueError(f\"eval_locate values must be euint*, got {value.data_type!r}\")\n00375: \n00376:         if expected_index is None:\n00377:             import os\n00378: \n00379:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_EXPECTED_INDEX\", \"0\"))",
+        "end": 379,
+        "match_line": 369,
+        "start": 359
+      },
+      {
+        "content": "00364:         values: list[KmsThresholdCiphertextHandle],\n00365:         *,\n00366:         expected_index: int | None = None,\n00367:     ) -> list[KmsThresholdCiphertextHandle]:\n00368:         if not values:\n00369:             raise ValueError(\"eval_locate requires at least one ciphertext\")\n00370: \n00371:         for value in values:\n00372:             self._ensure_kms_ciphertext(value)\n00373:             if not value.data_type.startswith(\"euint\"):\n00374:                 raise ValueError(f\"eval_locate values must be euint*, got {value.data_type!r}\")\n00375: \n00376:         if expected_index is None:\n00377:             import os\n00378: \n00379:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_EXPECTED_INDEX\", \"0\"))\n00380: \n00381:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00382: \n00383:         return KmsTfheEvalBridge().eval_locate(\n00384:             list(values),",
+        "end": 384,
+        "match_line": 374,
+        "start": 364
+      },
+      {
+        "content": "00373:             if not value.data_type.startswith(\"euint\"):\n00374:                 raise ValueError(f\"eval_locate values must be euint*, got {value.data_type!r}\")\n00375: \n00376:         if expected_index is None:\n00377:             import os\n00378: \n00379:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_EXPECTED_INDEX\", \"0\"))\n00380: \n00381:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00382: \n00383:         return KmsTfheEvalBridge().eval_locate(\n00384:             list(values),\n00385:             expected_index=expected_index,\n00386:         )\n00387: \n00388: \n00389:     def eval_locate_first_true(\n00390:         self,\n00391:         flags: list[KmsThresholdCiphertextHandle],\n00392:         *,\n00393:         expected_index: int | None = None,",
+        "end": 393,
+        "match_line": 383,
+        "start": 373
+      },
+      {
+        "content": "00379:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_EXPECTED_INDEX\", \"0\"))\n00380: \n00381:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00382: \n00383:         return KmsTfheEvalBridge().eval_locate(\n00384:             list(values),\n00385:             expected_index=expected_index,\n00386:         )\n00387: \n00388: \n00389:     def eval_locate_first_true(\n00390:         self,\n00391:         flags: list[KmsThresholdCiphertextHandle],\n00392:         *,\n00393:         expected_index: int | None = None,\n00394:     ) -> list[KmsThresholdCiphertextHandle]:\n00395:         if not flags:\n00396:             raise ValueError(\"eval_locate_first_true requires at least one flag\")\n00397: \n00398:         for flag in flags:\n00399:             self._ensure_kms_ciphertext(flag)",
+        "end": 399,
+        "match_line": 389,
+        "start": 379
+      },
+      {
+        "content": "00386:         )\n00387: \n00388: \n00389:     def eval_locate_first_true(\n00390:         self,\n00391:         flags: list[KmsThresholdCiphertextHandle],\n00392:         *,\n00393:         expected_index: int | None = None,\n00394:     ) -> list[KmsThresholdCiphertextHandle]:\n00395:         if not flags:\n00396:             raise ValueError(\"eval_locate_first_true requires at least one flag\")\n00397: \n00398:         for flag in flags:\n00399:             self._ensure_kms_ciphertext(flag)\n00400:             if flag.data_type != \"ebool\":\n00401:                 raise ValueError(f\"eval_locate_first_true flags must be ebool, got {flag.data_type!r}\")\n00402: \n00403:         if expected_index is None:\n00404:             import os\n00405: \n00406:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_BOOL_EXPECTED_INDEX\", \"0\"))",
+        "end": 406,
+        "match_line": 396,
+        "start": 386
+      },
+      {
+        "content": "00391:         flags: list[KmsThresholdCiphertextHandle],\n00392:         *,\n00393:         expected_index: int | None = None,\n00394:     ) -> list[KmsThresholdCiphertextHandle]:\n00395:         if not flags:\n00396:             raise ValueError(\"eval_locate_first_true requires at least one flag\")\n00397: \n00398:         for flag in flags:\n00399:             self._ensure_kms_ciphertext(flag)\n00400:             if flag.data_type != \"ebool\":\n00401:                 raise ValueError(f\"eval_locate_first_true flags must be ebool, got {flag.data_type!r}\")\n00402: \n00403:         if expected_index is None:\n00404:             import os\n00405: \n00406:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_BOOL_EXPECTED_INDEX\", \"0\"))\n00407: \n00408:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00409: \n00410:         return KmsTfheEvalBridge().eval_locate_first_true(\n00411:             list(flags),",
+        "end": 411,
+        "match_line": 401,
+        "start": 391
+      },
+      {
+        "content": "00400:             if flag.data_type != \"ebool\":\n00401:                 raise ValueError(f\"eval_locate_first_true flags must be ebool, got {flag.data_type!r}\")\n00402: \n00403:         if expected_index is None:\n00404:             import os\n00405: \n00406:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_BOOL_EXPECTED_INDEX\", \"0\"))\n00407: \n00408:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00409: \n00410:         return KmsTfheEvalBridge().eval_locate_first_true(\n00411:             list(flags),\n00412:             expected_index=expected_index,\n00413:         )\n00414: \n00415: \n00416:     def eval_select(\n00417:         self,\n00418:         selector: KmsThresholdCiphertextHandle,\n00419:         true_value: KmsThresholdCiphertextHandle,\n00420:         false_value: KmsThresholdCiphertextHandle,",
+        "end": 420,
+        "match_line": 410,
+        "start": 400
+      },
+      {
+        "content": "00406:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_BOOL_EXPECTED_INDEX\", \"0\"))\n00407: \n00408:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00409: \n00410:         return KmsTfheEvalBridge().eval_locate_first_true(\n00411:             list(flags),\n00412:             expected_index=expected_index,\n00413:         )\n00414: \n00415: \n00416:     def eval_select(\n00417:         self,\n00418:         selector: KmsThresholdCiphertextHandle,\n00419:         true_value: KmsThresholdCiphertextHandle,\n00420:         false_value: KmsThresholdCiphertextHandle,\n00421:         *,\n00422:         expected_result: int | None = None,\n00423:     ) -> KmsThresholdCiphertextHandle:\n00424:         self._ensure_kms_ciphertext(selector)\n00425:         self._ensure_kms_ciphertext(true_value)\n00426:         self._ensure_kms_ciphertext(false_value)",
+        "end": 426,
+        "match_line": 416,
+        "start": 406
+      },
+      {
+        "content": "00425:         self._ensure_kms_ciphertext(true_value)\n00426:         self._ensure_kms_ciphertext(false_value)\n00427: \n00428:         if expected_result is None:\n00429:             import os\n00430: \n00431:             expected_result = int(os.environ.get(\"POS_KMS_EVAL_SELECT_EXPECTED_RESULT\", \"0\"))\n00432: \n00433:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00434: \n00435:         return KmsTfheEvalBridge().eval_select(\n00436:             selector,\n00437:             true_value,\n00438:             false_value,\n00439:             expected_result=expected_result,\n00440:         )\n00441: \n00442:     def _ensure_kms_ciphertext(self, ciphertext: KmsThresholdCiphertextHandle) -> None:\n00443:         if ciphertext.backend != \"kms-threshold\":\n00444:             raise KmsThresholdBackendError(\n00445:                 f\"Expected kms-threshold ciphertext, got backend={ciphertext.backend!r}\"",
+        "end": 445,
+        "match_line": 435,
+        "start": 425
+      }
+    ],
+    "expected_context": [
+      {
+        "content": "00281: \n00282:     def eval_add(\n00283:         self,\n00284:         left: KmsThresholdCiphertextHandle,\n00285:         right: KmsThresholdCiphertextHandle,\n00286:         *,\n00287:         expected_result: int | None = None,\n00288:     ) -> KmsThresholdCiphertextHandle:\n00289:         self._ensure_kms_ciphertext(left)\n00290:         self._ensure_kms_ciphertext(right)\n00291: \n00292:         if not left.data_type.startswith(\"euint\"):\n00293:             raise ValueError(f\"left must be euint*, got {left.data_type!r}\")",
+        "end": 293,
+        "match_line": 287,
+        "start": 281
+      },
+      {
+        "content": "00293:             raise ValueError(f\"left must be euint*, got {left.data_type!r}\")\n00294:         if left.data_type != right.data_type:\n00295:             raise ValueError(\n00296:                 f\"left/right data_type mismatch: {left.data_type!r} != {right.data_type!r}\"\n00297:             )\n00298: \n00299:         if expected_result is None:\n00300:             import os\n00301: \n00302:             expected_result = int(os.environ.get(\"POS_KMS_EVAL_ADD_EXPECTED_RESULT\", \"0\"))\n00303: \n00304:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00305: ",
+        "end": 305,
+        "match_line": 299,
+        "start": 293
+      },
+      {
+        "content": "00296:                 f\"left/right data_type mismatch: {left.data_type!r} != {right.data_type!r}\"\n00297:             )\n00298: \n00299:         if expected_result is None:\n00300:             import os\n00301: \n00302:             expected_result = int(os.environ.get(\"POS_KMS_EVAL_ADD_EXPECTED_RESULT\", \"0\"))\n00303: \n00304:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00305: \n00306:         return KmsTfheEvalBridge().eval_add(\n00307:             left,\n00308:             right,",
+        "end": 308,
+        "match_line": 302,
+        "start": 296
+      },
+      {
+        "content": "00303: \n00304:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00305: \n00306:         return KmsTfheEvalBridge().eval_add(\n00307:             left,\n00308:             right,\n00309:             expected_result=expected_result,\n00310:         )\n00311: \n00312:     def eval_scale_prf(\n00313:         self,\n00314:         prf: KmsThresholdCiphertextHandle,\n00315:         *,",
+        "end": 315,
+        "match_line": 309,
+        "start": 303
+      },
+      {
+        "content": "00312:     def eval_scale_prf(\n00313:         self,\n00314:         prf: KmsThresholdCiphertextHandle,\n00315:         *,\n00316:         numerator: int,\n00317:         denominator: int,\n00318:         expected_result: int | None = None,\n00319:     ) -> KmsThresholdCiphertextHandle:\n00320:         self._ensure_kms_ciphertext(prf)\n00321: \n00322:         if not prf.data_type.startswith(\"euint\"):\n00323:             raise ValueError(f\"prf must be euint*, got {prf.data_type!r}\")\n00324: ",
+        "end": 324,
+        "match_line": 318,
+        "start": 312
+      },
+      {
+        "content": "00319:     ) -> KmsThresholdCiphertextHandle:\n00320:         self._ensure_kms_ciphertext(prf)\n00321: \n00322:         if not prf.data_type.startswith(\"euint\"):\n00323:             raise ValueError(f\"prf must be euint*, got {prf.data_type!r}\")\n00324: \n00325:         if expected_result is None:\n00326:             expected_result = (int(os.environ.get(\"POS_KMS_EVAL_SCALE_PRF_EXPECTED_RESULT\", \"0\")))\n00327: \n00328:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00329: \n00330:         return KmsTfheEvalBridge().eval_scale_prf(\n00331:             prf,",
+        "end": 331,
+        "match_line": 325,
+        "start": 319
+      },
+      {
+        "content": "00320:         self._ensure_kms_ciphertext(prf)\n00321: \n00322:         if not prf.data_type.startswith(\"euint\"):\n00323:             raise ValueError(f\"prf must be euint*, got {prf.data_type!r}\")\n00324: \n00325:         if expected_result is None:\n00326:             expected_result = (int(os.environ.get(\"POS_KMS_EVAL_SCALE_PRF_EXPECTED_RESULT\", \"0\")))\n00327: \n00328:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00329: \n00330:         return KmsTfheEvalBridge().eval_scale_prf(\n00331:             prf,\n00332:             numerator=int(numerator),",
+        "end": 332,
+        "match_line": 326,
+        "start": 320
+      },
+      {
+        "content": "00328:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00329: \n00330:         return KmsTfheEvalBridge().eval_scale_prf(\n00331:             prf,\n00332:             numerator=int(numerator),\n00333:             denominator=int(denominator),\n00334:             expected_result=int(expected_result),\n00335:         )\n00336: \n00337: \n00338:     def eval_compare(\n00339:         self,\n00340:         left: KmsThresholdCiphertextHandle,",
+        "end": 340,
+        "match_line": 334,
+        "start": 328
+      },
+      {
+        "content": "00337: \n00338:     def eval_compare(\n00339:         self,\n00340:         left: KmsThresholdCiphertextHandle,\n00341:         right: KmsThresholdCiphertextHandle,\n00342:         *,\n00343:         expected_result: bool | None = None,\n00344:     ) -> KmsThresholdCiphertextHandle:\n00345:         self._ensure_kms_ciphertext(left)\n00346:         self._ensure_kms_ciphertext(right)\n00347: \n00348:         if expected_result is None:\n00349:             import os",
+        "end": 349,
+        "match_line": 343,
+        "start": 337
+      },
+      {
+        "content": "00342:         *,\n00343:         expected_result: bool | None = None,\n00344:     ) -> KmsThresholdCiphertextHandle:\n00345:         self._ensure_kms_ciphertext(left)\n00346:         self._ensure_kms_ciphertext(right)\n00347: \n00348:         if expected_result is None:\n00349:             import os\n00350: \n00351:             expected_text = os.environ.get(\"POS_KMS_EVAL_COMPARE_EXPECTED_RESULT\", \"true\")\n00352:             expected_result = expected_text.strip().lower() in {\"1\", \"true\", \"yes\", \"on\"}\n00353: \n00354:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge",
+        "end": 354,
+        "match_line": 348,
+        "start": 342
+      },
+      {
+        "content": "00345:         self._ensure_kms_ciphertext(left)\n00346:         self._ensure_kms_ciphertext(right)\n00347: \n00348:         if expected_result is None:\n00349:             import os\n00350: \n00351:             expected_text = os.environ.get(\"POS_KMS_EVAL_COMPARE_EXPECTED_RESULT\", \"true\")\n00352:             expected_result = expected_text.strip().lower() in {\"1\", \"true\", \"yes\", \"on\"}\n00353: \n00354:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00355: \n00356:         return KmsTfheEvalBridge().eval_compare(\n00357:             left,",
+        "end": 357,
+        "match_line": 351,
+        "start": 345
+      },
+      {
+        "content": "00346:         self._ensure_kms_ciphertext(right)\n00347: \n00348:         if expected_result is None:\n00349:             import os\n00350: \n00351:             expected_text = os.environ.get(\"POS_KMS_EVAL_COMPARE_EXPECTED_RESULT\", \"true\")\n00352:             expected_result = expected_text.strip().lower() in {\"1\", \"true\", \"yes\", \"on\"}\n00353: \n00354:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00355: \n00356:         return KmsTfheEvalBridge().eval_compare(\n00357:             left,\n00358:             right,",
+        "end": 358,
+        "match_line": 352,
+        "start": 346
+      },
+      {
+        "content": "00353: \n00354:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00355: \n00356:         return KmsTfheEvalBridge().eval_compare(\n00357:             left,\n00358:             right,\n00359:             expected_result=expected_result,\n00360:         )\n00361: \n00362:     def eval_locate(\n00363:         self,\n00364:         values: list[KmsThresholdCiphertextHandle],\n00365:         *,",
+        "end": 365,
+        "match_line": 359,
+        "start": 353
+      },
+      {
+        "content": "00360:         )\n00361: \n00362:     def eval_locate(\n00363:         self,\n00364:         values: list[KmsThresholdCiphertextHandle],\n00365:         *,\n00366:         expected_index: int | None = None,\n00367:     ) -> list[KmsThresholdCiphertextHandle]:\n00368:         if not values:\n00369:             raise ValueError(\"eval_locate requires at least one ciphertext\")\n00370: \n00371:         for value in values:\n00372:             self._ensure_kms_ciphertext(value)",
+        "end": 372,
+        "match_line": 366,
+        "start": 360
+      },
+      {
+        "content": "00370: \n00371:         for value in values:\n00372:             self._ensure_kms_ciphertext(value)\n00373:             if not value.data_type.startswith(\"euint\"):\n00374:                 raise ValueError(f\"eval_locate values must be euint*, got {value.data_type!r}\")\n00375: \n00376:         if expected_index is None:\n00377:             import os\n00378: \n00379:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_EXPECTED_INDEX\", \"0\"))\n00380: \n00381:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00382: ",
+        "end": 382,
+        "match_line": 376,
+        "start": 370
+      },
+      {
+        "content": "00373:             if not value.data_type.startswith(\"euint\"):\n00374:                 raise ValueError(f\"eval_locate values must be euint*, got {value.data_type!r}\")\n00375: \n00376:         if expected_index is None:\n00377:             import os\n00378: \n00379:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_EXPECTED_INDEX\", \"0\"))\n00380: \n00381:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00382: \n00383:         return KmsTfheEvalBridge().eval_locate(\n00384:             list(values),\n00385:             expected_index=expected_index,",
+        "end": 385,
+        "match_line": 379,
+        "start": 373
+      },
+      {
+        "content": "00379:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_EXPECTED_INDEX\", \"0\"))\n00380: \n00381:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00382: \n00383:         return KmsTfheEvalBridge().eval_locate(\n00384:             list(values),\n00385:             expected_index=expected_index,\n00386:         )\n00387: \n00388: \n00389:     def eval_locate_first_true(\n00390:         self,\n00391:         flags: list[KmsThresholdCiphertextHandle],",
+        "end": 391,
+        "match_line": 385,
+        "start": 379
+      },
+      {
+        "content": "00387: \n00388: \n00389:     def eval_locate_first_true(\n00390:         self,\n00391:         flags: list[KmsThresholdCiphertextHandle],\n00392:         *,\n00393:         expected_index: int | None = None,\n00394:     ) -> list[KmsThresholdCiphertextHandle]:\n00395:         if not flags:\n00396:             raise ValueError(\"eval_locate_first_true requires at least one flag\")\n00397: \n00398:         for flag in flags:\n00399:             self._ensure_kms_ciphertext(flag)",
+        "end": 399,
+        "match_line": 393,
+        "start": 387
+      },
+      {
+        "content": "00397: \n00398:         for flag in flags:\n00399:             self._ensure_kms_ciphertext(flag)\n00400:             if flag.data_type != \"ebool\":\n00401:                 raise ValueError(f\"eval_locate_first_true flags must be ebool, got {flag.data_type!r}\")\n00402: \n00403:         if expected_index is None:\n00404:             import os\n00405: \n00406:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_BOOL_EXPECTED_INDEX\", \"0\"))\n00407: \n00408:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00409: ",
+        "end": 409,
+        "match_line": 403,
+        "start": 397
+      },
+      {
+        "content": "00400:             if flag.data_type != \"ebool\":\n00401:                 raise ValueError(f\"eval_locate_first_true flags must be ebool, got {flag.data_type!r}\")\n00402: \n00403:         if expected_index is None:\n00404:             import os\n00405: \n00406:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_BOOL_EXPECTED_INDEX\", \"0\"))\n00407: \n00408:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00409: \n00410:         return KmsTfheEvalBridge().eval_locate_first_true(\n00411:             list(flags),\n00412:             expected_index=expected_index,",
+        "end": 412,
+        "match_line": 406,
+        "start": 400
+      },
+      {
+        "content": "00406:             expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_BOOL_EXPECTED_INDEX\", \"0\"))\n00407: \n00408:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00409: \n00410:         return KmsTfheEvalBridge().eval_locate_first_true(\n00411:             list(flags),\n00412:             expected_index=expected_index,\n00413:         )\n00414: \n00415: \n00416:     def eval_select(\n00417:         self,\n00418:         selector: KmsThresholdCiphertextHandle,",
+        "end": 418,
+        "match_line": 412,
+        "start": 406
+      },
+      {
+        "content": "00416:     def eval_select(\n00417:         self,\n00418:         selector: KmsThresholdCiphertextHandle,\n00419:         true_value: KmsThresholdCiphertextHandle,\n00420:         false_value: KmsThresholdCiphertextHandle,\n00421:         *,\n00422:         expected_result: int | None = None,\n00423:     ) -> KmsThresholdCiphertextHandle:\n00424:         self._ensure_kms_ciphertext(selector)\n00425:         self._ensure_kms_ciphertext(true_value)\n00426:         self._ensure_kms_ciphertext(false_value)\n00427: \n00428:         if expected_result is None:",
+        "end": 428,
+        "match_line": 422,
+        "start": 416
+      },
+      {
+        "content": "00422:         expected_result: int | None = None,\n00423:     ) -> KmsThresholdCiphertextHandle:\n00424:         self._ensure_kms_ciphertext(selector)\n00425:         self._ensure_kms_ciphertext(true_value)\n00426:         self._ensure_kms_ciphertext(false_value)\n00427: \n00428:         if expected_result is None:\n00429:             import os\n00430: \n00431:             expected_result = int(os.environ.get(\"POS_KMS_EVAL_SELECT_EXPECTED_RESULT\", \"0\"))\n00432: \n00433:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00434: ",
+        "end": 434,
+        "match_line": 428,
+        "start": 422
+      },
+      {
+        "content": "00425:         self._ensure_kms_ciphertext(true_value)\n00426:         self._ensure_kms_ciphertext(false_value)\n00427: \n00428:         if expected_result is None:\n00429:             import os\n00430: \n00431:             expected_result = int(os.environ.get(\"POS_KMS_EVAL_SELECT_EXPECTED_RESULT\", \"0\"))\n00432: \n00433:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00434: \n00435:         return KmsTfheEvalBridge().eval_select(\n00436:             selector,\n00437:             true_value,",
+        "end": 437,
+        "match_line": 431,
+        "start": 425
+      },
+      {
+        "content": "00433:         from pos.crypto.thfhe_backend.kms_eval_bridge import KmsTfheEvalBridge\n00434: \n00435:         return KmsTfheEvalBridge().eval_select(\n00436:             selector,\n00437:             true_value,\n00438:             false_value,\n00439:             expected_result=expected_result,\n00440:         )\n00441: \n00442:     def _ensure_kms_ciphertext(self, ciphertext: KmsThresholdCiphertextHandle) -> None:\n00443:         if ciphertext.backend != \"kms-threshold\":\n00444:             raise KmsThresholdBackendError(\n00445:                 f\"Expected kms-threshold ciphertext, got backend={ciphertext.backend!r}\"",
+        "end": 445,
+        "match_line": 439,
+        "start": 433
+      }
+    ],
+    "expected_matches": [
+      {
+        "line": 287,
+        "text": "        expected_result: int | None = None,"
+      },
+      {
+        "line": 299,
+        "text": "        if expected_result is None:"
+      },
+      {
+        "line": 302,
+        "text": "            expected_result = int(os.environ.get(\"POS_KMS_EVAL_ADD_EXPECTED_RESULT\", \"0\"))"
+      },
+      {
+        "line": 309,
+        "text": "            expected_result=expected_result,"
+      },
+      {
+        "line": 318,
+        "text": "        expected_result: int | None = None,"
+      },
+      {
+        "line": 325,
+        "text": "        if expected_result is None:"
+      },
+      {
+        "line": 326,
+        "text": "            expected_result = (int(os.environ.get(\"POS_KMS_EVAL_SCALE_PRF_EXPECTED_RESULT\", \"0\")))"
+      },
+      {
+        "line": 334,
+        "text": "            expected_result=int(expected_result),"
+      },
+      {
+        "line": 343,
+        "text": "        expected_result: bool | None = None,"
+      },
+      {
+        "line": 348,
+        "text": "        if expected_result is None:"
+      },
+      {
+        "line": 351,
+        "text": "            expected_text = os.environ.get(\"POS_KMS_EVAL_COMPARE_EXPECTED_RESULT\", \"true\")"
+      },
+      {
+        "line": 352,
+        "text": "            expected_result = expected_text.strip().lower() in {\"1\", \"true\", \"yes\", \"on\"}"
+      },
+      {
+        "line": 359,
+        "text": "            expected_result=expected_result,"
+      },
+      {
+        "line": 366,
+        "text": "        expected_index: int | None = None,"
+      },
+      {
+        "line": 376,
+        "text": "        if expected_index is None:"
+      },
+      {
+        "line": 379,
+        "text": "            expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_EXPECTED_INDEX\", \"0\"))"
+      },
+      {
+        "line": 385,
+        "text": "            expected_index=expected_index,"
+      },
+      {
+        "line": 393,
+        "text": "        expected_index: int | None = None,"
+      },
+      {
+        "line": 403,
+        "text": "        if expected_index is None:"
+      },
+      {
+        "line": 406,
+        "text": "            expected_index = int(os.environ.get(\"POS_KMS_EVAL_LOCATE_BOOL_EXPECTED_INDEX\", \"0\"))"
+      },
+      {
+        "line": 412,
+        "text": "            expected_index=expected_index,"
+      },
+      {
+        "line": 422,
+        "text": "        expected_result: int | None = None,"
+      },
+      {
+        "line": 428,
+        "text": "        if expected_result is None:"
+      },
+      {
+        "line": 431,
+        "text": "            expected_result = int(os.environ.get(\"POS_KMS_EVAL_SELECT_EXPECTED_RESULT\", \"0\"))"
+      },
+      {
+        "line": 439,
+        "text": "            expected_result=expected_result,"
+      }
+    ]
+  },
+  "/mnt/d/biancheng/pycharm/scientific_project/kms/core-client/src/bin/kms-tfhe-eval.rs": {
+    "command_context": [
+      {
+        "content": "00001: use anyhow::{bail, Context, Result};\n00002: use clap::{Parser, Subcommand};\n00003: use kms_core_client::{\n00004:     eval_add_euint8_external, eval_add_euint32_external, eval_compare_euint8_external,\n00005:     eval_compare_euint32_external, eval_locate_first_true_ebool_external,\n00006:     eval_locate_min_euint8_external, eval_select_euint8_external,\n00007:     eval_select_euint16_external, eval_scale_prf_euint8_external,\n00008:     eval_scale_prf_euint32_external, inspect_server_key_external,\n00009:     read_cipher_with_params_external_view,\n00010: };\n00011: use serde::Serialize;\n00012: use std::path::PathBuf;\n00013: \n00014: #[derive(Parser, Debug)]",
+        "end": 14,
+        "match_line": 4,
+        "start": 1
+      },
+      {
+        "content": "00001: use anyhow::{bail, Context, Result};\n00002: use clap::{Parser, Subcommand};\n00003: use kms_core_client::{\n00004:     eval_add_euint8_external, eval_add_euint32_external, eval_compare_euint8_external,\n00005:     eval_compare_euint32_external, eval_locate_first_true_ebool_external,\n00006:     eval_locate_min_euint8_external, eval_select_euint8_external,\n00007:     eval_select_euint16_external, eval_scale_prf_euint8_external,\n00008:     eval_scale_prf_euint32_external, inspect_server_key_external,\n00009:     read_cipher_with_params_external_view,\n00010: };\n00011: use serde::Serialize;\n00012: use std::path::PathBuf;\n00013: \n00014: #[derive(Parser, Debug)]\n00015: #[command(name = \"kms-tfhe-eval\")]",
+        "end": 15,
+        "match_line": 5,
+        "start": 1
+      },
+      {
+        "content": "00001: use anyhow::{bail, Context, Result};\n00002: use clap::{Parser, Subcommand};\n00003: use kms_core_client::{\n00004:     eval_add_euint8_external, eval_add_euint32_external, eval_compare_euint8_external,\n00005:     eval_compare_euint32_external, eval_locate_first_true_ebool_external,\n00006:     eval_locate_min_euint8_external, eval_select_euint8_external,\n00007:     eval_select_euint16_external, eval_scale_prf_euint8_external,\n00008:     eval_scale_prf_euint32_external, inspect_server_key_external,\n00009:     read_cipher_with_params_external_view,\n00010: };\n00011: use serde::Serialize;\n00012: use std::path::PathBuf;\n00013: \n00014: #[derive(Parser, Debug)]\n00015: #[command(name = \"kms-tfhe-eval\")]\n00016: #[command(about = \"PoS native KMS/TFHE evaluator validation tool\")]",
+        "end": 16,
+        "match_line": 6,
+        "start": 1
+      },
+      {
+        "content": "00001: use anyhow::{bail, Context, Result};\n00002: use clap::{Parser, Subcommand};\n00003: use kms_core_client::{\n00004:     eval_add_euint8_external, eval_add_euint32_external, eval_compare_euint8_external,\n00005:     eval_compare_euint32_external, eval_locate_first_true_ebool_external,\n00006:     eval_locate_min_euint8_external, eval_select_euint8_external,\n00007:     eval_select_euint16_external, eval_scale_prf_euint8_external,\n00008:     eval_scale_prf_euint32_external, inspect_server_key_external,\n00009:     read_cipher_with_params_external_view,\n00010: };\n00011: use serde::Serialize;\n00012: use std::path::PathBuf;\n00013: \n00014: #[derive(Parser, Debug)]\n00015: #[command(name = \"kms-tfhe-eval\")]\n00016: #[command(about = \"PoS native KMS/TFHE evaluator validation tool\")]\n00017: struct Cli {",
+        "end": 17,
+        "match_line": 7,
+        "start": 1
+      },
+      {
+        "content": "00001: use anyhow::{bail, Context, Result};\n00002: use clap::{Parser, Subcommand};\n00003: use kms_core_client::{\n00004:     eval_add_euint8_external, eval_add_euint32_external, eval_compare_euint8_external,\n00005:     eval_compare_euint32_external, eval_locate_first_true_ebool_external,\n00006:     eval_locate_min_euint8_external, eval_select_euint8_external,\n00007:     eval_select_euint16_external, eval_scale_prf_euint8_external,\n00008:     eval_scale_prf_euint32_external, inspect_server_key_external,\n00009:     read_cipher_with_params_external_view,\n00010: };\n00011: use serde::Serialize;\n00012: use std::path::PathBuf;\n00013: \n00014: #[derive(Parser, Debug)]\n00015: #[command(name = \"kms-tfhe-eval\")]\n00016: #[command(about = \"PoS native KMS/TFHE evaluator validation tool\")]\n00017: struct Cli {\n00018:     #[command(subcommand)]",
+        "end": 18,
+        "match_line": 8,
+        "start": 1
+      },
+      {
+        "content": "00029:         #[arg(long)]\n00030:         server_key: PathBuf,\n00031:         #[arg(long)]\n00032:         expected_key_id: String,\n00033:         #[arg(long, default_value = \"euint8\")]\n00034:         expected_data_type: String,\n00035:         #[arg(long, default_value = \"SmallExpanded\")]\n00036:         expected_ct_format: String,\n00037:     },\n00038: \n00039:     EvalAdd {\n00040:         #[arg(long)]\n00041:         left: PathBuf,\n00042:         #[arg(long)]\n00043:         right: PathBuf,\n00044:         #[arg(long)]\n00045:         server_key: PathBuf,\n00046:         #[arg(long)]\n00047:         output: PathBuf,\n00048:         #[arg(long)]\n00049:         expected_key_id: String,",
+        "end": 49,
+        "match_line": 39,
+        "start": 29
+      },
+      {
+        "content": "00044:         #[arg(long)]\n00045:         server_key: PathBuf,\n00046:         #[arg(long)]\n00047:         output: PathBuf,\n00048:         #[arg(long)]\n00049:         expected_key_id: String,\n00050:         #[arg(long)]\n00051:         expected_result: u64,\n00052:     },\n00053: \n00054:     EvalScalePrf {\n00055:         #[arg(long)]\n00056:         prf: PathBuf,\n00057:         #[arg(long)]\n00058:         server_key: PathBuf,\n00059:         #[arg(long)]\n00060:         output: PathBuf,\n00061:         #[arg(long)]\n00062:         expected_key_id: String,\n00063:         #[arg(long)]\n00064:         numerator: u64,",
+        "end": 64,
+        "match_line": 54,
+        "start": 44
+      },
+      {
+        "content": "00061:         #[arg(long)]\n00062:         expected_key_id: String,\n00063:         #[arg(long)]\n00064:         numerator: u64,\n00065:         #[arg(long)]\n00066:         denominator: u64,\n00067:         #[arg(long)]\n00068:         expected_result: u64,\n00069:     },\n00070: \n00071:     EvalCompare {\n00072:         #[arg(long)]\n00073:         left: PathBuf,\n00074:         #[arg(long)]\n00075:         right: PathBuf,\n00076:         #[arg(long)]\n00077:         server_key: PathBuf,\n00078:         #[arg(long)]\n00079:         output: PathBuf,\n00080:         #[arg(long)]\n00081:         expected_key_id: String,",
+        "end": 81,
+        "match_line": 71,
+        "start": 61
+      },
+      {
+        "content": "00076:         #[arg(long)]\n00077:         server_key: PathBuf,\n00078:         #[arg(long)]\n00079:         output: PathBuf,\n00080:         #[arg(long)]\n00081:         expected_key_id: String,\n00082:         #[arg(long)]\n00083:         expected_result: String,\n00084:     },\n00085: \n00086:     EvalSelect {\n00087:         #[arg(long)]\n00088:         selector: PathBuf,\n00089:         #[arg(long)]\n00090:         true_value: PathBuf,\n00091:         #[arg(long)]\n00092:         false_value: PathBuf,\n00093:         #[arg(long)]\n00094:         server_key: PathBuf,\n00095:         #[arg(long)]\n00096:         output: PathBuf,",
+        "end": 96,
+        "match_line": 86,
+        "start": 76
+      },
+      {
+        "content": "00093:         #[arg(long)]\n00094:         server_key: PathBuf,\n00095:         #[arg(long)]\n00096:         output: PathBuf,\n00097:         #[arg(long)]\n00098:         expected_key_id: String,\n00099:         #[arg(long)]\n00100:         expected_result: u64,\n00101:     },\n00102: \n00103:     EvalLocate {\n00104:         #[arg(long = \"value\", required = true)]\n00105:         values: Vec<PathBuf>,\n00106:         #[arg(long)]\n00107:         server_key: PathBuf,\n00108:         #[arg(long)]\n00109:         output_dir: PathBuf,\n00110:         #[arg(long)]\n00111:         expected_key_id: String,\n00112:         #[arg(long)]\n00113:         expected_index: usize,",
+        "end": 113,
+        "match_line": 103,
+        "start": 93
+      },
+      {
+        "content": "00106:         #[arg(long)]\n00107:         server_key: PathBuf,\n00108:         #[arg(long)]\n00109:         output_dir: PathBuf,\n00110:         #[arg(long)]\n00111:         expected_key_id: String,\n00112:         #[arg(long)]\n00113:         expected_index: usize,\n00114:     },\n00115: \n00116:     EvalLocateBool {\n00117:         #[arg(long = \"flag\", required = true)]\n00118:         flags: Vec<PathBuf>,\n00119:         #[arg(long)]\n00120:         server_key: PathBuf,\n00121:         #[arg(long)]\n00122:         output_dir: PathBuf,\n00123:         #[arg(long)]\n00124:         expected_key_id: String,\n00125:         #[arg(long)]\n00126:         expected_index: usize,",
+        "end": 126,
+        "match_line": 116,
+        "start": 106
+      },
+      {
+        "content": "00194:                 right,\n00195:                 server_key,\n00196:                 expected_key_id,\n00197:                 expected_data_type,\n00198:                 expected_ct_format,\n00199:             )\n00200:             .await?;\n00201:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00202:         }\n00203: \n00204:         Command::EvalAdd {\n00205:             left,\n00206:             right,\n00207:             server_key,\n00208:             output,\n00209:             expected_key_id,\n00210:             expected_result,\n00211:         } => {\n00212:             let report = eval_add_command(\n00213:                 left,\n00214:                 right,",
+        "end": 214,
+        "match_line": 204,
+        "start": 194
+      },
+      {
+        "content": "00202:         }\n00203: \n00204:         Command::EvalAdd {\n00205:             left,\n00206:             right,\n00207:             server_key,\n00208:             output,\n00209:             expected_key_id,\n00210:             expected_result,\n00211:         } => {\n00212:             let report = eval_add_command(\n00213:                 left,\n00214:                 right,\n00215:                 server_key,\n00216:                 output,\n00217:                 expected_key_id,\n00218:                 expected_result,\n00219:             )\n00220:             .await?;\n00221:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00222:         }",
+        "end": 222,
+        "match_line": 212,
+        "start": 202
+      },
+      {
+        "content": "00214:                 right,\n00215:                 server_key,\n00216:                 output,\n00217:                 expected_key_id,\n00218:                 expected_result,\n00219:             )\n00220:             .await?;\n00221:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00222:         }\n00223: \n00224:         Command::EvalScalePrf {\n00225:             prf,\n00226:             server_key,\n00227:             output,\n00228:             expected_key_id,\n00229:             numerator,\n00230:             denominator,\n00231:             expected_result,\n00232:         } => {\n00233:             let report = eval_scale_prf_command(\n00234:                 prf,",
+        "end": 234,
+        "match_line": 224,
+        "start": 214
+      },
+      {
+        "content": "00223: \n00224:         Command::EvalScalePrf {\n00225:             prf,\n00226:             server_key,\n00227:             output,\n00228:             expected_key_id,\n00229:             numerator,\n00230:             denominator,\n00231:             expected_result,\n00232:         } => {\n00233:             let report = eval_scale_prf_command(\n00234:                 prf,\n00235:                 server_key,\n00236:                 output,\n00237:                 expected_key_id,\n00238:                 numerator,\n00239:                 denominator,\n00240:                 expected_result,\n00241:             )\n00242:             .await?;\n00243:             println!(\"{}\", serde_json::to_string_pretty(&report)?);",
+        "end": 243,
+        "match_line": 233,
+        "start": 223
+      },
+      {
+        "content": "00236:                 output,\n00237:                 expected_key_id,\n00238:                 numerator,\n00239:                 denominator,\n00240:                 expected_result,\n00241:             )\n00242:             .await?;\n00243:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00244:         }\n00245: \n00246:         Command::EvalCompare {\n00247:             left,\n00248:             right,\n00249:             server_key,\n00250:             output,\n00251:             expected_key_id,\n00252:             expected_result,\n00253:         } => {\n00254:             let expected_result = parse_expected_result(&expected_result)?;\n00255:             let report = eval_compare_command(\n00256:                 left,",
+        "end": 256,
+        "match_line": 246,
+        "start": 236
+      },
+      {
+        "content": "00245: \n00246:         Command::EvalCompare {\n00247:             left,\n00248:             right,\n00249:             server_key,\n00250:             output,\n00251:             expected_key_id,\n00252:             expected_result,\n00253:         } => {\n00254:             let expected_result = parse_expected_result(&expected_result)?;\n00255:             let report = eval_compare_command(\n00256:                 left,\n00257:                 right,\n00258:                 server_key,\n00259:                 output,\n00260:                 expected_key_id,\n00261:                 expected_result,\n00262:             )\n00263:             .await?;\n00264:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00265:         }",
+        "end": 265,
+        "match_line": 255,
+        "start": 245
+      },
+      {
+        "content": "00257:                 right,\n00258:                 server_key,\n00259:                 output,\n00260:                 expected_key_id,\n00261:                 expected_result,\n00262:             )\n00263:             .await?;\n00264:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00265:         }\n00266: \n00267:         Command::EvalSelect {\n00268:             selector,\n00269:             true_value,\n00270:             false_value,\n00271:             server_key,\n00272:             output,\n00273:             expected_key_id,\n00274:             expected_result,\n00275:         } => {\n00276:             let report = eval_select_command(\n00277:                 selector,",
+        "end": 277,
+        "match_line": 267,
+        "start": 257
+      },
+      {
+        "content": "00266: \n00267:         Command::EvalSelect {\n00268:             selector,\n00269:             true_value,\n00270:             false_value,\n00271:             server_key,\n00272:             output,\n00273:             expected_key_id,\n00274:             expected_result,\n00275:         } => {\n00276:             let report = eval_select_command(\n00277:                 selector,\n00278:                 true_value,\n00279:                 false_value,\n00280:                 server_key,\n00281:                 output,\n00282:                 expected_key_id,\n00283:                 expected_result,\n00284:             )\n00285:             .await?;\n00286:             println!(\"{}\", serde_json::to_string_pretty(&report)?);",
+        "end": 286,
+        "match_line": 276,
+        "start": 266
+      },
+      {
+        "content": "00279:                 false_value,\n00280:                 server_key,\n00281:                 output,\n00282:                 expected_key_id,\n00283:                 expected_result,\n00284:             )\n00285:             .await?;\n00286:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00287:         }\n00288: \n00289:         Command::EvalLocate {\n00290:             values,\n00291:             server_key,\n00292:             output_dir,\n00293:             expected_key_id,\n00294:             expected_index,\n00295:         } => {\n00296:             let report = eval_locate_command(\n00297:                 values,\n00298:                 server_key,\n00299:                 output_dir,",
+        "end": 299,
+        "match_line": 289,
+        "start": 279
+      },
+      {
+        "content": "00286:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00287:         }\n00288: \n00289:         Command::EvalLocate {\n00290:             values,\n00291:             server_key,\n00292:             output_dir,\n00293:             expected_key_id,\n00294:             expected_index,\n00295:         } => {\n00296:             let report = eval_locate_command(\n00297:                 values,\n00298:                 server_key,\n00299:                 output_dir,\n00300:                 expected_key_id,\n00301:                 expected_index,\n00302:             )\n00303:             .await?;\n00304:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00305:         }\n00306: ",
+        "end": 306,
+        "match_line": 296,
+        "start": 286
+      },
+      {
+        "content": "00297:                 values,\n00298:                 server_key,\n00299:                 output_dir,\n00300:                 expected_key_id,\n00301:                 expected_index,\n00302:             )\n00303:             .await?;\n00304:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00305:         }\n00306: \n00307:         Command::EvalLocateBool {\n00308:             flags,\n00309:             server_key,\n00310:             output_dir,\n00311:             expected_key_id,\n00312:             expected_index,\n00313:         } => {\n00314:             let report = eval_locate_bool_command(\n00315:                 flags,\n00316:                 server_key,\n00317:                 output_dir,",
+        "end": 317,
+        "match_line": 307,
+        "start": 297
+      },
+      {
+        "content": "00304:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00305:         }\n00306: \n00307:         Command::EvalLocateBool {\n00308:             flags,\n00309:             server_key,\n00310:             output_dir,\n00311:             expected_key_id,\n00312:             expected_index,\n00313:         } => {\n00314:             let report = eval_locate_bool_command(\n00315:                 flags,\n00316:                 server_key,\n00317:                 output_dir,\n00318:                 expected_key_id,\n00319:                 expected_index,\n00320:             )\n00321:             .await?;\n00322:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00323:         }\n00324: ",
+        "end": 324,
+        "match_line": 314,
+        "start": 304
+      },
+      {
+        "content": "00375: \n00376: fn parse_expected_result(value: &str) -> Result<bool> {\n00377:     match value.trim().to_ascii_lowercase().as_str() {\n00378:         \"1\" | \"true\" | \"yes\" | \"on\" => Ok(true),\n00379:         \"0\" | \"false\" | \"no\" | \"off\" => Ok(false),\n00380:         other => bail!(\"invalid --expected-result value {other:?}; use true/false or 1/0\"),\n00381:     }\n00382: }\n00383: \n00384: \n00385: async fn eval_add_command(\n00386:     left_path: PathBuf,\n00387:     right_path: PathBuf,\n00388:     server_key_path: PathBuf,\n00389:     output_path: PathBuf,\n00390:     expected_key_id: String,\n00391:     expected_result: u64,\n00392: ) -> Result<EvalSingleReport> {\n00393:     let left_view = read_cipher_with_params_external_view(&left_path)\n00394:         .await\n00395:         .with_context(|| format!(\"failed to inspect left ciphertext {}\", left_path.display()))?;",
+        "end": 395,
+        "match_line": 385,
+        "start": 375
+      },
+      {
+        "content": "00393:     let left_view = read_cipher_with_params_external_view(&left_path)\n00394:         .await\n00395:         .with_context(|| format!(\"failed to inspect left ciphertext {}\", left_path.display()))?;\n00396: \n00397:     match left_view.data_type.as_str() {\n00398:         \"euint8\" => {\n00399:             let expected_u8: u8 = expected_result\n00400:                 .try_into()\n00401:                 .with_context(|| \"expected_result does not fit euint8\")?;\n00402: \n00403:             let output = eval_add_euint8_external(\n00404:                 &left_path,\n00405:                 &right_path,\n00406:                 &server_key_path,\n00407:                 &output_path,\n00408:                 &expected_key_id,\n00409:                 expected_u8,\n00410:             )\n00411:             .await\n00412:             .with_context(|| \"real TFHE eval_add euint8 failed\")?;\n00413: ",
+        "end": 413,
+        "match_line": 403,
+        "start": 393
+      },
+      {
+        "content": "00402: \n00403:             let output = eval_add_euint8_external(\n00404:                 &left_path,\n00405:                 &right_path,\n00406:                 &server_key_path,\n00407:                 &output_path,\n00408:                 &expected_key_id,\n00409:                 expected_u8,\n00410:             )\n00411:             .await\n00412:             .with_context(|| \"real TFHE eval_add euint8 failed\")?;\n00413: \n00414:             validate_cipher(\"output\", &output, &expected_key_id, \"euint8\", \"SmallExpanded\")?;\n00415: \n00416:             Ok(EvalSingleReport {\n00417:                 ok: true,\n00418:                 operation: \"euint8_add\".to_owned(),\n00419:                 expected_result: serde_json::json!(expected_result),\n00420:                 output_path: output_path.display().to_string(),\n00421:                 output: to_report(output_path, output),\n00422:             })",
+        "end": 422,
+        "match_line": 412,
+        "start": 402
+      },
+      {
+        "content": "00420:                 output_path: output_path.display().to_string(),\n00421:                 output: to_report(output_path, output),\n00422:             })\n00423:         }\n00424: \n00425:         \"euint32\" => {\n00426:             let expected_u32: u32 = expected_result\n00427:                 .try_into()\n00428:                 .with_context(|| \"expected_result does not fit euint32\")?;\n00429: \n00430:             let output = eval_add_euint32_external(\n00431:                 &left_path,\n00432:                 &right_path,\n00433:                 &server_key_path,\n00434:                 &output_path,\n00435:                 &expected_key_id,\n00436:                 expected_u32,\n00437:             )\n00438:             .await\n00439:             .with_context(|| \"real TFHE eval_add euint32 failed\")?;\n00440: ",
+        "end": 440,
+        "match_line": 430,
+        "start": 420
+      },
+      {
+        "content": "00429: \n00430:             let output = eval_add_euint32_external(\n00431:                 &left_path,\n00432:                 &right_path,\n00433:                 &server_key_path,\n00434:                 &output_path,\n00435:                 &expected_key_id,\n00436:                 expected_u32,\n00437:             )\n00438:             .await\n00439:             .with_context(|| \"real TFHE eval_add euint32 failed\")?;\n00440: \n00441:             validate_cipher(\"output\", &output, &expected_key_id, \"euint32\", \"SmallExpanded\")?;\n00442: \n00443:             Ok(EvalSingleReport {\n00444:                 ok: true,\n00445:                 operation: \"euint32_add\".to_owned(),\n00446:                 expected_result: serde_json::json!(expected_result),\n00447:                 output_path: output_path.display().to_string(),\n00448:                 output: to_report(output_path, output),\n00449:             })",
+        "end": 449,
+        "match_line": 439,
+        "start": 429
+      },
+      {
+        "content": "00447:                 output_path: output_path.display().to_string(),\n00448:                 output: to_report(output_path, output),\n00449:             })\n00450:         }\n00451: \n00452:         other => bail!(\"eval-add unsupported input data_type {other:?}; expected euint8 or euint32\"),\n00453:     }\n00454: }\n00455: \n00456: \n00457: async fn eval_scale_prf_command(\n00458:     prf_path: PathBuf,\n00459:     server_key_path: PathBuf,\n00460:     output_path: PathBuf,\n00461:     expected_key_id: String,\n00462:     numerator: u64,\n00463:     denominator: u64,\n00464:     expected_result: u64,\n00465: ) -> Result<EvalSingleReport> {\n00466:     let prf_view = read_cipher_with_params_external_view(&prf_path)\n00467:         .await",
+        "end": 467,
+        "match_line": 457,
+        "start": 447
+      },
+      {
+        "content": "00472:             let numerator_u16: u16 = numerator\n00473:                 .try_into()\n00474:                 .with_context(|| \"numerator does not fit u16 for euint8 scale\")?;\n00475:             let denominator_u16: u16 = denominator\n00476:                 .try_into()\n00477:                 .with_context(|| \"denominator does not fit u16 for euint8 scale\")?;\n00478:             let expected_u8: u8 = expected_result\n00479:                 .try_into()\n00480:                 .with_context(|| \"expected_result does not fit euint8\")?;\n00481: \n00482:             let output = eval_scale_prf_euint8_external(\n00483:                 &prf_path,\n00484:                 &server_key_path,\n00485:                 &output_path,\n00486:                 &expected_key_id,\n00487:                 numerator_u16,\n00488:                 denominator_u16,\n00489:                 expected_u8,\n00490:             )\n00491:             .await\n00492:             .with_context(|| \"real TFHE eval_scale_prf euint8 failed\")?;",
+        "end": 492,
+        "match_line": 482,
+        "start": 472
+      },
+      {
+        "content": "00482:             let output = eval_scale_prf_euint8_external(\n00483:                 &prf_path,\n00484:                 &server_key_path,\n00485:                 &output_path,\n00486:                 &expected_key_id,\n00487:                 numerator_u16,\n00488:                 denominator_u16,\n00489:                 expected_u8,\n00490:             )\n00491:             .await\n00492:             .with_context(|| \"real TFHE eval_scale_prf euint8 failed\")?;\n00493: \n00494:             validate_cipher(\"output\", &output, &expected_key_id, \"euint8\", \"SmallExpanded\")?;\n00495: \n00496:             Ok(EvalSingleReport {\n00497:                 ok: true,\n00498:                 operation: \"euint8_scale_prf\".to_owned(),\n00499:                 expected_result: serde_json::json!(expected_result),\n00500:                 output_path: output_path.display().to_string(),\n00501:                 output: to_report(output_path, output),\n00502:             })",
+        "end": 502,
+        "match_line": 492,
+        "start": 482
+      },
+      {
+        "content": "00500:                 output_path: output_path.display().to_string(),\n00501:                 output: to_report(output_path, output),\n00502:             })\n00503:         }\n00504: \n00505:         \"euint32\" => {\n00506:             let expected_u32: u32 = expected_result\n00507:                 .try_into()\n00508:                 .with_context(|| \"expected_result does not fit euint32\")?;\n00509: \n00510:             let output = eval_scale_prf_euint32_external(\n00511:                 &prf_path,\n00512:                 &server_key_path,\n00513:                 &output_path,\n00514:                 &expected_key_id,\n00515:                 numerator,\n00516:                 denominator,\n00517:                 expected_u32,\n00518:             )\n00519:             .await\n00520:             .with_context(|| \"real TFHE eval_scale_prf euint32 failed\")?;",
+        "end": 520,
+        "match_line": 510,
+        "start": 500
+      },
+      {
+        "content": "00510:             let output = eval_scale_prf_euint32_external(\n00511:                 &prf_path,\n00512:                 &server_key_path,\n00513:                 &output_path,\n00514:                 &expected_key_id,\n00515:                 numerator,\n00516:                 denominator,\n00517:                 expected_u32,\n00518:             )\n00519:             .await\n00520:             .with_context(|| \"real TFHE eval_scale_prf euint32 failed\")?;\n00521: \n00522:             validate_cipher(\"output\", &output, &expected_key_id, \"euint32\", \"SmallExpanded\")?;\n00523: \n00524:             Ok(EvalSingleReport {\n00525:                 ok: true,\n00526:                 operation: \"euint32_scale_prf\".to_owned(),\n00527:                 expected_result: serde_json::json!(expected_result),\n00528:                 output_path: output_path.display().to_string(),\n00529:                 output: to_report(output_path, output),\n00530:             })",
+        "end": 530,
+        "match_line": 520,
+        "start": 510
+      },
+      {
+        "content": "00528:                 output_path: output_path.display().to_string(),\n00529:                 output: to_report(output_path, output),\n00530:             })\n00531:         }\n00532: \n00533:         other => bail!(\"eval-scale-prf unsupported input data_type {other:?}; expected euint8 or euint32\"),\n00534:     }\n00535: }\n00536: \n00537: \n00538: async fn eval_compare_command(\n00539:     left_path: PathBuf,\n00540:     right_path: PathBuf,\n00541:     server_key_path: PathBuf,\n00542:     output_path: PathBuf,\n00543:     expected_key_id: String,\n00544:     expected_result: bool,\n00545: ) -> Result<EvalSingleReport> {\n00546:     let left_view = read_cipher_with_params_external_view(&left_path)\n00547:         .await\n00548:         .with_context(|| format!(\"failed to inspect left ciphertext {}\", left_path.display()))?;",
+        "end": 548,
+        "match_line": 538,
+        "start": 528
+      },
+      {
+        "content": "00542:     output_path: PathBuf,\n00543:     expected_key_id: String,\n00544:     expected_result: bool,\n00545: ) -> Result<EvalSingleReport> {\n00546:     let left_view = read_cipher_with_params_external_view(&left_path)\n00547:         .await\n00548:         .with_context(|| format!(\"failed to inspect left ciphertext {}\", left_path.display()))?;\n00549: \n00550:     match left_view.data_type.as_str() {\n00551:         \"euint8\" => {\n00552:             let output = eval_compare_euint8_external(\n00553:                 &left_path,\n00554:                 &right_path,\n00555:                 &server_key_path,\n00556:                 &output_path,\n00557:                 &expected_key_id,\n00558:                 expected_result,\n00559:             )\n00560:             .await\n00561:             .with_context(|| \"real TFHE eval_compare euint8 failed\")?;\n00562: ",
+        "end": 562,
+        "match_line": 552,
+        "start": 542
+      },
+      {
+        "content": "00551:         \"euint8\" => {\n00552:             let output = eval_compare_euint8_external(\n00553:                 &left_path,\n00554:                 &right_path,\n00555:                 &server_key_path,\n00556:                 &output_path,\n00557:                 &expected_key_id,\n00558:                 expected_result,\n00559:             )\n00560:             .await\n00561:             .with_context(|| \"real TFHE eval_compare euint8 failed\")?;\n00562: \n00563:             validate_cipher(\"output\", &output, &expected_key_id, \"ebool\", \"SmallExpanded\")?;\n00564: \n00565:             Ok(EvalSingleReport {\n00566:                 ok: true,\n00567:                 operation: \"euint8_lt\".to_owned(),\n00568:                 expected_result: serde_json::json!(expected_result),\n00569:                 output_path: output_path.display().to_string(),\n00570:                 output: to_report(output_path, output),\n00571:             })",
+        "end": 571,
+        "match_line": 561,
+        "start": 551
+      },
+      {
+        "content": "00565:             Ok(EvalSingleReport {\n00566:                 ok: true,\n00567:                 operation: \"euint8_lt\".to_owned(),\n00568:                 expected_result: serde_json::json!(expected_result),\n00569:                 output_path: output_path.display().to_string(),\n00570:                 output: to_report(output_path, output),\n00571:             })\n00572:         }\n00573: \n00574:         \"euint32\" => {\n00575:             let output = eval_compare_euint32_external(\n00576:                 &left_path,\n00577:                 &right_path,\n00578:                 &server_key_path,\n00579:                 &output_path,\n00580:                 &expected_key_id,\n00581:                 expected_result,\n00582:             )\n00583:             .await\n00584:             .with_context(|| \"real TFHE eval_compare euint32 failed\")?;\n00585: ",
+        "end": 585,
+        "match_line": 575,
+        "start": 565
+      },
+      {
+        "content": "00574:         \"euint32\" => {\n00575:             let output = eval_compare_euint32_external(\n00576:                 &left_path,\n00577:                 &right_path,\n00578:                 &server_key_path,\n00579:                 &output_path,\n00580:                 &expected_key_id,\n00581:                 expected_result,\n00582:             )\n00583:             .await\n00584:             .with_context(|| \"real TFHE eval_compare euint32 failed\")?;\n00585: \n00586:             validate_cipher(\"output\", &output, &expected_key_id, \"ebool\", \"SmallExpanded\")?;\n00587: \n00588:             Ok(EvalSingleReport {\n00589:                 ok: true,\n00590:                 operation: \"euint32_lt\".to_owned(),\n00591:                 expected_result: serde_json::json!(expected_result),\n00592:                 output_path: output_path.display().to_string(),\n00593:                 output: to_report(output_path, output),\n00594:             })",
+        "end": 594,
+        "match_line": 584,
+        "start": 574
+      },
+      {
+        "content": "00592:                 output_path: output_path.display().to_string(),\n00593:                 output: to_report(output_path, output),\n00594:             })\n00595:         }\n00596: \n00597:         other => bail!(\"eval-compare unsupported input data_type {other:?}; expected euint8 or euint32\"),\n00598:     }\n00599: }\n00600: \n00601: \n00602: async fn eval_select_command(\n00603:     selector_path: PathBuf,\n00604:     true_value_path: PathBuf,\n00605:     false_value_path: PathBuf,\n00606:     server_key_path: PathBuf,\n00607:     output_path: PathBuf,\n00608:     expected_key_id: String,\n00609:     expected_result: u64,\n00610: ) -> Result<EvalSingleReport> {\n00611:     let true_view = read_cipher_with_params_external_view(&true_value_path)\n00612:         .await",
+        "end": 612,
+        "match_line": 602,
+        "start": 592
+      },
+      {
+        "content": "00611:     let true_view = read_cipher_with_params_external_view(&true_value_path)\n00612:         .await\n00613:         .with_context(|| format!(\"failed to inspect true_value ciphertext {}\", true_value_path.display()))?;\n00614: \n00615:     match true_view.data_type.as_str() {\n00616:         \"euint8\" => {\n00617:             let expected_u8: u8 = expected_result\n00618:                 .try_into()\n00619:                 .with_context(|| \"expected_result does not fit euint8\")?;\n00620: \n00621:             let output = eval_select_euint8_external(\n00622:                 &selector_path,\n00623:                 &true_value_path,\n00624:                 &false_value_path,\n00625:                 &server_key_path,\n00626:                 &output_path,\n00627:                 &expected_key_id,\n00628:                 expected_u8,\n00629:             )\n00630:             .await\n00631:             .with_context(|| \"real TFHE eval_select euint8 failed\")?;",
+        "end": 631,
+        "match_line": 621,
+        "start": 611
+      },
+      {
+        "content": "00621:             let output = eval_select_euint8_external(\n00622:                 &selector_path,\n00623:                 &true_value_path,\n00624:                 &false_value_path,\n00625:                 &server_key_path,\n00626:                 &output_path,\n00627:                 &expected_key_id,\n00628:                 expected_u8,\n00629:             )\n00630:             .await\n00631:             .with_context(|| \"real TFHE eval_select euint8 failed\")?;\n00632: \n00633:             validate_cipher(\"output\", &output, &expected_key_id, \"euint8\", \"SmallExpanded\")?;\n00634: \n00635:             Ok(EvalSingleReport {\n00636:                 ok: true,\n00637:                 operation: \"ebool_cmux_euint8\".to_owned(),\n00638:                 expected_result: serde_json::json!(expected_result),\n00639:                 output_path: output_path.display().to_string(),\n00640:                 output: to_report(output_path, output),\n00641:             })",
+        "end": 641,
+        "match_line": 631,
+        "start": 621
+      },
+      {
+        "content": "00639:                 output_path: output_path.display().to_string(),\n00640:                 output: to_report(output_path, output),\n00641:             })\n00642:         }\n00643: \n00644:         \"euint16\" => {\n00645:             let expected_u16: u16 = expected_result\n00646:                 .try_into()\n00647:                 .with_context(|| \"expected_result does not fit euint16\")?;\n00648: \n00649:             let output = eval_select_euint16_external(\n00650:                 &selector_path,\n00651:                 &true_value_path,\n00652:                 &false_value_path,\n00653:                 &server_key_path,\n00654:                 &output_path,\n00655:                 &expected_key_id,\n00656:                 expected_u16,\n00657:             )\n00658:             .await\n00659:             .with_context(|| \"real TFHE eval_select euint16 failed\")?;",
+        "end": 659,
+        "match_line": 649,
+        "start": 639
+      },
+      {
+        "content": "00649:             let output = eval_select_euint16_external(\n00650:                 &selector_path,\n00651:                 &true_value_path,\n00652:                 &false_value_path,\n00653:                 &server_key_path,\n00654:                 &output_path,\n00655:                 &expected_key_id,\n00656:                 expected_u16,\n00657:             )\n00658:             .await\n00659:             .with_context(|| \"real TFHE eval_select euint16 failed\")?;\n00660: \n00661:             validate_cipher(\"output\", &output, &expected_key_id, \"euint16\", \"SmallExpanded\")?;\n00662: \n00663:             Ok(EvalSingleReport {\n00664:                 ok: true,\n00665:                 operation: \"ebool_cmux_euint16\".to_owned(),\n00666:                 expected_result: serde_json::json!(expected_result),\n00667:                 output_path: output_path.display().to_string(),\n00668:                 output: to_report(output_path, output),\n00669:             })",
+        "end": 669,
+        "match_line": 659,
+        "start": 649
+      },
+      {
+        "content": "00666:                 expected_result: serde_json::json!(expected_result),\n00667:                 output_path: output_path.display().to_string(),\n00668:                 output: to_report(output_path, output),\n00669:             })\n00670:         }\n00671: \n00672:         other => bail!(\"eval-select unsupported true_value data_type {other:?}; expected euint8 or euint16\"),\n00673:     }\n00674: }\n00675: \n00676: async fn eval_locate_command(\n00677:     values: Vec<PathBuf>,\n00678:     server_key_path: PathBuf,\n00679:     output_dir: PathBuf,\n00680:     expected_key_id: String,\n00681:     expected_index: usize,\n00682: ) -> Result<EvalVectorReport> {\n00683:     let outputs = eval_locate_min_euint8_external(\n00684:         &values,\n00685:         &server_key_path,\n00686:         &output_dir,",
+        "end": 686,
+        "match_line": 676,
+        "start": 666
+      },
+      {
+        "content": "00673:     }\n00674: }\n00675: \n00676: async fn eval_locate_command(\n00677:     values: Vec<PathBuf>,\n00678:     server_key_path: PathBuf,\n00679:     output_dir: PathBuf,\n00680:     expected_key_id: String,\n00681:     expected_index: usize,\n00682: ) -> Result<EvalVectorReport> {\n00683:     let outputs = eval_locate_min_euint8_external(\n00684:         &values,\n00685:         &server_key_path,\n00686:         &output_dir,\n00687:         &expected_key_id,\n00688:         expected_index,\n00689:     )\n00690:     .await\n00691:     .with_context(|| \"real TFHE eval_locate failed\")?;\n00692: \n00693:     let mut reports = Vec::with_capacity(outputs.len());",
+        "end": 693,
+        "match_line": 683,
+        "start": 673
+      },
+      {
+        "content": "00681:     expected_index: usize,\n00682: ) -> Result<EvalVectorReport> {\n00683:     let outputs = eval_locate_min_euint8_external(\n00684:         &values,\n00685:         &server_key_path,\n00686:         &output_dir,\n00687:         &expected_key_id,\n00688:         expected_index,\n00689:     )\n00690:     .await\n00691:     .with_context(|| \"real TFHE eval_locate failed\")?;\n00692: \n00693:     let mut reports = Vec::with_capacity(outputs.len());\n00694: \n00695:     for (idx, output) in outputs.into_iter().enumerate() {\n00696:         validate_cipher(\n00697:             &format!(\"output[{idx}]\"),\n00698:             &output,\n00699:             &expected_key_id,\n00700:             \"ebool\",\n00701:             \"SmallExpanded\",",
+        "end": 701,
+        "match_line": 691,
+        "start": 681
+      },
+      {
+        "content": "00709: \n00710:     Ok(EvalVectorReport {\n00711:         ok: true,\n00712:         operation: \"euint8_argmin_onehot\".to_owned(),\n00713:         expected_index,\n00714:         output_dir: output_dir.display().to_string(),\n00715:         outputs: reports,\n00716:     })\n00717: }\n00718: \n00719: async fn eval_locate_bool_command(\n00720:     flags: Vec<PathBuf>,\n00721:     server_key_path: PathBuf,\n00722:     output_dir: PathBuf,\n00723:     expected_key_id: String,\n00724:     expected_index: usize,\n00725: ) -> Result<EvalVectorReport> {\n00726:     let outputs = eval_locate_first_true_ebool_external(\n00727:         &flags,\n00728:         &server_key_path,\n00729:         &output_dir,",
+        "end": 729,
+        "match_line": 719,
+        "start": 709
+      },
+      {
+        "content": "00716:     })\n00717: }\n00718: \n00719: async fn eval_locate_bool_command(\n00720:     flags: Vec<PathBuf>,\n00721:     server_key_path: PathBuf,\n00722:     output_dir: PathBuf,\n00723:     expected_key_id: String,\n00724:     expected_index: usize,\n00725: ) -> Result<EvalVectorReport> {\n00726:     let outputs = eval_locate_first_true_ebool_external(\n00727:         &flags,\n00728:         &server_key_path,\n00729:         &output_dir,\n00730:         &expected_key_id,\n00731:         expected_index,\n00732:     )\n00733:     .await\n00734:     .with_context(|| \"real TFHE eval_locate_bool failed\")?;\n00735: \n00736:     let mut reports = Vec::with_capacity(outputs.len());",
+        "end": 736,
+        "match_line": 726,
+        "start": 716
+      },
+      {
+        "content": "00724:     expected_index: usize,\n00725: ) -> Result<EvalVectorReport> {\n00726:     let outputs = eval_locate_first_true_ebool_external(\n00727:         &flags,\n00728:         &server_key_path,\n00729:         &output_dir,\n00730:         &expected_key_id,\n00731:         expected_index,\n00732:     )\n00733:     .await\n00734:     .with_context(|| \"real TFHE eval_locate_bool failed\")?;\n00735: \n00736:     let mut reports = Vec::with_capacity(outputs.len());\n00737: \n00738:     for (idx, output) in outputs.into_iter().enumerate() {\n00739:         validate_cipher(\n00740:             &format!(\"output[{idx}]\"),\n00741:             &output,\n00742:             &expected_key_id,\n00743:             \"ebool\",\n00744:             \"SmallExpanded\",",
+        "end": 744,
+        "match_line": 734,
+        "start": 724
+      }
+    ],
+    "expected_context": [
+      {
+        "content": "00045:         server_key: PathBuf,\n00046:         #[arg(long)]\n00047:         output: PathBuf,\n00048:         #[arg(long)]\n00049:         expected_key_id: String,\n00050:         #[arg(long)]\n00051:         expected_result: u64,\n00052:     },\n00053: \n00054:     EvalScalePrf {\n00055:         #[arg(long)]\n00056:         prf: PathBuf,\n00057:         #[arg(long)]",
+        "end": 57,
+        "match_line": 51,
+        "start": 45
+      },
+      {
+        "content": "00062:         expected_key_id: String,\n00063:         #[arg(long)]\n00064:         numerator: u64,\n00065:         #[arg(long)]\n00066:         denominator: u64,\n00067:         #[arg(long)]\n00068:         expected_result: u64,\n00069:     },\n00070: \n00071:     EvalCompare {\n00072:         #[arg(long)]\n00073:         left: PathBuf,\n00074:         #[arg(long)]",
+        "end": 74,
+        "match_line": 68,
+        "start": 62
+      },
+      {
+        "content": "00077:         server_key: PathBuf,\n00078:         #[arg(long)]\n00079:         output: PathBuf,\n00080:         #[arg(long)]\n00081:         expected_key_id: String,\n00082:         #[arg(long)]\n00083:         expected_result: String,\n00084:     },\n00085: \n00086:     EvalSelect {\n00087:         #[arg(long)]\n00088:         selector: PathBuf,\n00089:         #[arg(long)]",
+        "end": 89,
+        "match_line": 83,
+        "start": 77
+      },
+      {
+        "content": "00094:         server_key: PathBuf,\n00095:         #[arg(long)]\n00096:         output: PathBuf,\n00097:         #[arg(long)]\n00098:         expected_key_id: String,\n00099:         #[arg(long)]\n00100:         expected_result: u64,\n00101:     },\n00102: \n00103:     EvalLocate {\n00104:         #[arg(long = \"value\", required = true)]\n00105:         values: Vec<PathBuf>,\n00106:         #[arg(long)]",
+        "end": 106,
+        "match_line": 100,
+        "start": 94
+      },
+      {
+        "content": "00107:         server_key: PathBuf,\n00108:         #[arg(long)]\n00109:         output_dir: PathBuf,\n00110:         #[arg(long)]\n00111:         expected_key_id: String,\n00112:         #[arg(long)]\n00113:         expected_index: usize,\n00114:     },\n00115: \n00116:     EvalLocateBool {\n00117:         #[arg(long = \"flag\", required = true)]\n00118:         flags: Vec<PathBuf>,\n00119:         #[arg(long)]",
+        "end": 119,
+        "match_line": 113,
+        "start": 107
+      },
+      {
+        "content": "00120:         server_key: PathBuf,\n00121:         #[arg(long)]\n00122:         output_dir: PathBuf,\n00123:         #[arg(long)]\n00124:         expected_key_id: String,\n00125:         #[arg(long)]\n00126:         expected_index: usize,\n00127:     },\n00128: \n00129:     InspectServerKey {\n00130:         #[arg(long)]\n00131:         server_key: PathBuf,\n00132:     },",
+        "end": 132,
+        "match_line": 126,
+        "start": 120
+      },
+      {
+        "content": "00159: }\n00160: \n00161: #[derive(Debug, Serialize)]\n00162: struct EvalSingleReport {\n00163:     ok: bool,\n00164:     operation: String,\n00165:     expected_result: serde_json::Value,\n00166:     output_path: String,\n00167:     output: CipherReport,\n00168: }\n00169: \n00170: #[derive(Debug, Serialize)]\n00171: struct EvalVectorReport {",
+        "end": 171,
+        "match_line": 165,
+        "start": 159
+      },
+      {
+        "content": "00168: }\n00169: \n00170: #[derive(Debug, Serialize)]\n00171: struct EvalVectorReport {\n00172:     ok: bool,\n00173:     operation: String,\n00174:     expected_index: usize,\n00175:     output_dir: String,\n00176:     outputs: Vec<CipherReport>,\n00177: }\n00178: \n00179: #[tokio::main]\n00180: async fn main() -> Result<()> {",
+        "end": 180,
+        "match_line": 174,
+        "start": 168
+      },
+      {
+        "content": "00204:         Command::EvalAdd {\n00205:             left,\n00206:             right,\n00207:             server_key,\n00208:             output,\n00209:             expected_key_id,\n00210:             expected_result,\n00211:         } => {\n00212:             let report = eval_add_command(\n00213:                 left,\n00214:                 right,\n00215:                 server_key,\n00216:                 output,",
+        "end": 216,
+        "match_line": 210,
+        "start": 204
+      },
+      {
+        "content": "00212:             let report = eval_add_command(\n00213:                 left,\n00214:                 right,\n00215:                 server_key,\n00216:                 output,\n00217:                 expected_key_id,\n00218:                 expected_result,\n00219:             )\n00220:             .await?;\n00221:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00222:         }\n00223: \n00224:         Command::EvalScalePrf {",
+        "end": 224,
+        "match_line": 218,
+        "start": 212
+      },
+      {
+        "content": "00225:             prf,\n00226:             server_key,\n00227:             output,\n00228:             expected_key_id,\n00229:             numerator,\n00230:             denominator,\n00231:             expected_result,\n00232:         } => {\n00233:             let report = eval_scale_prf_command(\n00234:                 prf,\n00235:                 server_key,\n00236:                 output,\n00237:                 expected_key_id,",
+        "end": 237,
+        "match_line": 231,
+        "start": 225
+      },
+      {
+        "content": "00234:                 prf,\n00235:                 server_key,\n00236:                 output,\n00237:                 expected_key_id,\n00238:                 numerator,\n00239:                 denominator,\n00240:                 expected_result,\n00241:             )\n00242:             .await?;\n00243:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00244:         }\n00245: \n00246:         Command::EvalCompare {",
+        "end": 246,
+        "match_line": 240,
+        "start": 234
+      },
+      {
+        "content": "00246:         Command::EvalCompare {\n00247:             left,\n00248:             right,\n00249:             server_key,\n00250:             output,\n00251:             expected_key_id,\n00252:             expected_result,\n00253:         } => {\n00254:             let expected_result = parse_expected_result(&expected_result)?;\n00255:             let report = eval_compare_command(\n00256:                 left,\n00257:                 right,\n00258:                 server_key,",
+        "end": 258,
+        "match_line": 252,
+        "start": 246
+      },
+      {
+        "content": "00248:             right,\n00249:             server_key,\n00250:             output,\n00251:             expected_key_id,\n00252:             expected_result,\n00253:         } => {\n00254:             let expected_result = parse_expected_result(&expected_result)?;\n00255:             let report = eval_compare_command(\n00256:                 left,\n00257:                 right,\n00258:                 server_key,\n00259:                 output,\n00260:                 expected_key_id,",
+        "end": 260,
+        "match_line": 254,
+        "start": 248
+      },
+      {
+        "content": "00255:             let report = eval_compare_command(\n00256:                 left,\n00257:                 right,\n00258:                 server_key,\n00259:                 output,\n00260:                 expected_key_id,\n00261:                 expected_result,\n00262:             )\n00263:             .await?;\n00264:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00265:         }\n00266: \n00267:         Command::EvalSelect {",
+        "end": 267,
+        "match_line": 261,
+        "start": 255
+      },
+      {
+        "content": "00268:             selector,\n00269:             true_value,\n00270:             false_value,\n00271:             server_key,\n00272:             output,\n00273:             expected_key_id,\n00274:             expected_result,\n00275:         } => {\n00276:             let report = eval_select_command(\n00277:                 selector,\n00278:                 true_value,\n00279:                 false_value,\n00280:                 server_key,",
+        "end": 280,
+        "match_line": 274,
+        "start": 268
+      },
+      {
+        "content": "00277:                 selector,\n00278:                 true_value,\n00279:                 false_value,\n00280:                 server_key,\n00281:                 output,\n00282:                 expected_key_id,\n00283:                 expected_result,\n00284:             )\n00285:             .await?;\n00286:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00287:         }\n00288: \n00289:         Command::EvalLocate {",
+        "end": 289,
+        "match_line": 283,
+        "start": 277
+      },
+      {
+        "content": "00288: \n00289:         Command::EvalLocate {\n00290:             values,\n00291:             server_key,\n00292:             output_dir,\n00293:             expected_key_id,\n00294:             expected_index,\n00295:         } => {\n00296:             let report = eval_locate_command(\n00297:                 values,\n00298:                 server_key,\n00299:                 output_dir,\n00300:                 expected_key_id,",
+        "end": 300,
+        "match_line": 294,
+        "start": 288
+      },
+      {
+        "content": "00295:         } => {\n00296:             let report = eval_locate_command(\n00297:                 values,\n00298:                 server_key,\n00299:                 output_dir,\n00300:                 expected_key_id,\n00301:                 expected_index,\n00302:             )\n00303:             .await?;\n00304:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00305:         }\n00306: \n00307:         Command::EvalLocateBool {",
+        "end": 307,
+        "match_line": 301,
+        "start": 295
+      },
+      {
+        "content": "00306: \n00307:         Command::EvalLocateBool {\n00308:             flags,\n00309:             server_key,\n00310:             output_dir,\n00311:             expected_key_id,\n00312:             expected_index,\n00313:         } => {\n00314:             let report = eval_locate_bool_command(\n00315:                 flags,\n00316:                 server_key,\n00317:                 output_dir,\n00318:                 expected_key_id,",
+        "end": 318,
+        "match_line": 312,
+        "start": 306
+      },
+      {
+        "content": "00313:         } => {\n00314:             let report = eval_locate_bool_command(\n00315:                 flags,\n00316:                 server_key,\n00317:                 output_dir,\n00318:                 expected_key_id,\n00319:                 expected_index,\n00320:             )\n00321:             .await?;\n00322:             println!(\"{}\", serde_json::to_string_pretty(&report)?);\n00323:         }\n00324: \n00325:         Command::InspectServerKey { server_key } => {",
+        "end": 325,
+        "match_line": 319,
+        "start": 313
+      },
+      {
+        "content": "00370:         server_key_prefix_hex: hex::encode(&server_key_bytes[..prefix_len]),\n00371:         left: to_report(left_path, left),\n00372:         right: to_report(right_path, right),\n00373:     })\n00374: }\n00375: \n00376: fn parse_expected_result(value: &str) -> Result<bool> {\n00377:     match value.trim().to_ascii_lowercase().as_str() {\n00378:         \"1\" | \"true\" | \"yes\" | \"on\" => Ok(true),\n00379:         \"0\" | \"false\" | \"no\" | \"off\" => Ok(false),\n00380:         other => bail!(\"invalid --expected-result value {other:?}; use true/false or 1/0\"),\n00381:     }\n00382: }",
+        "end": 382,
+        "match_line": 376,
+        "start": 370
+      },
+      {
+        "content": "00374: }\n00375: \n00376: fn parse_expected_result(value: &str) -> Result<bool> {\n00377:     match value.trim().to_ascii_lowercase().as_str() {\n00378:         \"1\" | \"true\" | \"yes\" | \"on\" => Ok(true),\n00379:         \"0\" | \"false\" | \"no\" | \"off\" => Ok(false),\n00380:         other => bail!(\"invalid --expected-result value {other:?}; use true/false or 1/0\"),\n00381:     }\n00382: }\n00383: \n00384: \n00385: async fn eval_add_command(\n00386:     left_path: PathBuf,",
+        "end": 386,
+        "match_line": 380,
+        "start": 374
+      },
+      {
+        "content": "00385: async fn eval_add_command(\n00386:     left_path: PathBuf,\n00387:     right_path: PathBuf,\n00388:     server_key_path: PathBuf,\n00389:     output_path: PathBuf,\n00390:     expected_key_id: String,\n00391:     expected_result: u64,\n00392: ) -> Result<EvalSingleReport> {\n00393:     let left_view = read_cipher_with_params_external_view(&left_path)\n00394:         .await\n00395:         .with_context(|| format!(\"failed to inspect left ciphertext {}\", left_path.display()))?;\n00396: \n00397:     match left_view.data_type.as_str() {",
+        "end": 397,
+        "match_line": 391,
+        "start": 385
+      },
+      {
+        "content": "00393:     let left_view = read_cipher_with_params_external_view(&left_path)\n00394:         .await\n00395:         .with_context(|| format!(\"failed to inspect left ciphertext {}\", left_path.display()))?;\n00396: \n00397:     match left_view.data_type.as_str() {\n00398:         \"euint8\" => {\n00399:             let expected_u8: u8 = expected_result\n00400:                 .try_into()\n00401:                 .with_context(|| \"expected_result does not fit euint8\")?;\n00402: \n00403:             let output = eval_add_euint8_external(\n00404:                 &left_path,\n00405:                 &right_path,",
+        "end": 405,
+        "match_line": 399,
+        "start": 393
+      },
+      {
+        "content": "00395:         .with_context(|| format!(\"failed to inspect left ciphertext {}\", left_path.display()))?;\n00396: \n00397:     match left_view.data_type.as_str() {\n00398:         \"euint8\" => {\n00399:             let expected_u8: u8 = expected_result\n00400:                 .try_into()\n00401:                 .with_context(|| \"expected_result does not fit euint8\")?;\n00402: \n00403:             let output = eval_add_euint8_external(\n00404:                 &left_path,\n00405:                 &right_path,\n00406:                 &server_key_path,\n00407:                 &output_path,",
+        "end": 407,
+        "match_line": 401,
+        "start": 395
+      },
+      {
+        "content": "00413: \n00414:             validate_cipher(\"output\", &output, &expected_key_id, \"euint8\", \"SmallExpanded\")?;\n00415: \n00416:             Ok(EvalSingleReport {\n00417:                 ok: true,\n00418:                 operation: \"euint8_add\".to_owned(),\n00419:                 expected_result: serde_json::json!(expected_result),\n00420:                 output_path: output_path.display().to_string(),\n00421:                 output: to_report(output_path, output),\n00422:             })\n00423:         }\n00424: \n00425:         \"euint32\" => {",
+        "end": 425,
+        "match_line": 419,
+        "start": 413
+      },
+      {
+        "content": "00420:                 output_path: output_path.display().to_string(),\n00421:                 output: to_report(output_path, output),\n00422:             })\n00423:         }\n00424: \n00425:         \"euint32\" => {\n00426:             let expected_u32: u32 = expected_result\n00427:                 .try_into()\n00428:                 .with_context(|| \"expected_result does not fit euint32\")?;\n00429: \n00430:             let output = eval_add_euint32_external(\n00431:                 &left_path,\n00432:                 &right_path,",
+        "end": 432,
+        "match_line": 426,
+        "start": 420
+      },
+      {
+        "content": "00422:             })\n00423:         }\n00424: \n00425:         \"euint32\" => {\n00426:             let expected_u32: u32 = expected_result\n00427:                 .try_into()\n00428:                 .with_context(|| \"expected_result does not fit euint32\")?;\n00429: \n00430:             let output = eval_add_euint32_external(\n00431:                 &left_path,\n00432:                 &right_path,\n00433:                 &server_key_path,\n00434:                 &output_path,",
+        "end": 434,
+        "match_line": 428,
+        "start": 422
+      },
+      {
+        "content": "00440: \n00441:             validate_cipher(\"output\", &output, &expected_key_id, \"euint32\", \"SmallExpanded\")?;\n00442: \n00443:             Ok(EvalSingleReport {\n00444:                 ok: true,\n00445:                 operation: \"euint32_add\".to_owned(),\n00446:                 expected_result: serde_json::json!(expected_result),\n00447:                 output_path: output_path.display().to_string(),\n00448:                 output: to_report(output_path, output),\n00449:             })\n00450:         }\n00451: \n00452:         other => bail!(\"eval-add unsupported input data_type {other:?}; expected euint8 or euint32\"),",
+        "end": 452,
+        "match_line": 446,
+        "start": 440
+      },
+      {
+        "content": "00458:     prf_path: PathBuf,\n00459:     server_key_path: PathBuf,\n00460:     output_path: PathBuf,\n00461:     expected_key_id: String,\n00462:     numerator: u64,\n00463:     denominator: u64,\n00464:     expected_result: u64,\n00465: ) -> Result<EvalSingleReport> {\n00466:     let prf_view = read_cipher_with_params_external_view(&prf_path)\n00467:         .await\n00468:         .with_context(|| format!(\"failed to inspect prf ciphertext {}\", prf_path.display()))?;\n00469: \n00470:     match prf_view.data_type.as_str() {",
+        "end": 470,
+        "match_line": 464,
+        "start": 458
+      },
+      {
+        "content": "00472:             let numerator_u16: u16 = numerator\n00473:                 .try_into()\n00474:                 .with_context(|| \"numerator does not fit u16 for euint8 scale\")?;\n00475:             let denominator_u16: u16 = denominator\n00476:                 .try_into()\n00477:                 .with_context(|| \"denominator does not fit u16 for euint8 scale\")?;\n00478:             let expected_u8: u8 = expected_result\n00479:                 .try_into()\n00480:                 .with_context(|| \"expected_result does not fit euint8\")?;\n00481: \n00482:             let output = eval_scale_prf_euint8_external(\n00483:                 &prf_path,\n00484:                 &server_key_path,",
+        "end": 484,
+        "match_line": 478,
+        "start": 472
+      },
+      {
+        "content": "00474:                 .with_context(|| \"numerator does not fit u16 for euint8 scale\")?;\n00475:             let denominator_u16: u16 = denominator\n00476:                 .try_into()\n00477:                 .with_context(|| \"denominator does not fit u16 for euint8 scale\")?;\n00478:             let expected_u8: u8 = expected_result\n00479:                 .try_into()\n00480:                 .with_context(|| \"expected_result does not fit euint8\")?;\n00481: \n00482:             let output = eval_scale_prf_euint8_external(\n00483:                 &prf_path,\n00484:                 &server_key_path,\n00485:                 &output_path,\n00486:                 &expected_key_id,",
+        "end": 486,
+        "match_line": 480,
+        "start": 474
+      },
+      {
+        "content": "00493: \n00494:             validate_cipher(\"output\", &output, &expected_key_id, \"euint8\", \"SmallExpanded\")?;\n00495: \n00496:             Ok(EvalSingleReport {\n00497:                 ok: true,\n00498:                 operation: \"euint8_scale_prf\".to_owned(),\n00499:                 expected_result: serde_json::json!(expected_result),\n00500:                 output_path: output_path.display().to_string(),\n00501:                 output: to_report(output_path, output),\n00502:             })\n00503:         }\n00504: \n00505:         \"euint32\" => {",
+        "end": 505,
+        "match_line": 499,
+        "start": 493
+      },
+      {
+        "content": "00500:                 output_path: output_path.display().to_string(),\n00501:                 output: to_report(output_path, output),\n00502:             })\n00503:         }\n00504: \n00505:         \"euint32\" => {\n00506:             let expected_u32: u32 = expected_result\n00507:                 .try_into()\n00508:                 .with_context(|| \"expected_result does not fit euint32\")?;\n00509: \n00510:             let output = eval_scale_prf_euint32_external(\n00511:                 &prf_path,\n00512:                 &server_key_path,",
+        "end": 512,
+        "match_line": 506,
+        "start": 500
+      },
+      {
+        "content": "00502:             })\n00503:         }\n00504: \n00505:         \"euint32\" => {\n00506:             let expected_u32: u32 = expected_result\n00507:                 .try_into()\n00508:                 .with_context(|| \"expected_result does not fit euint32\")?;\n00509: \n00510:             let output = eval_scale_prf_euint32_external(\n00511:                 &prf_path,\n00512:                 &server_key_path,\n00513:                 &output_path,\n00514:                 &expected_key_id,",
+        "end": 514,
+        "match_line": 508,
+        "start": 502
+      },
+      {
+        "content": "00521: \n00522:             validate_cipher(\"output\", &output, &expected_key_id, \"euint32\", \"SmallExpanded\")?;\n00523: \n00524:             Ok(EvalSingleReport {\n00525:                 ok: true,\n00526:                 operation: \"euint32_scale_prf\".to_owned(),\n00527:                 expected_result: serde_json::json!(expected_result),\n00528:                 output_path: output_path.display().to_string(),\n00529:                 output: to_report(output_path, output),\n00530:             })\n00531:         }\n00532: \n00533:         other => bail!(\"eval-scale-prf unsupported input data_type {other:?}; expected euint8 or euint32\"),",
+        "end": 533,
+        "match_line": 527,
+        "start": 521
+      },
+      {
+        "content": "00538: async fn eval_compare_command(\n00539:     left_path: PathBuf,\n00540:     right_path: PathBuf,\n00541:     server_key_path: PathBuf,\n00542:     output_path: PathBuf,\n00543:     expected_key_id: String,\n00544:     expected_result: bool,\n00545: ) -> Result<EvalSingleReport> {\n00546:     let left_view = read_cipher_with_params_external_view(&left_path)\n00547:         .await\n00548:         .with_context(|| format!(\"failed to inspect left ciphertext {}\", left_path.display()))?;\n00549: \n00550:     match left_view.data_type.as_str() {",
+        "end": 550,
+        "match_line": 544,
+        "start": 538
+      },
+      {
+        "content": "00552:             let output = eval_compare_euint8_external(\n00553:                 &left_path,\n00554:                 &right_path,\n00555:                 &server_key_path,\n00556:                 &output_path,\n00557:                 &expected_key_id,\n00558:                 expected_result,\n00559:             )\n00560:             .await\n00561:             .with_context(|| \"real TFHE eval_compare euint8 failed\")?;\n00562: \n00563:             validate_cipher(\"output\", &output, &expected_key_id, \"ebool\", \"SmallExpanded\")?;\n00564: ",
+        "end": 564,
+        "match_line": 558,
+        "start": 552
+      },
+      {
+        "content": "00562: \n00563:             validate_cipher(\"output\", &output, &expected_key_id, \"ebool\", \"SmallExpanded\")?;\n00564: \n00565:             Ok(EvalSingleReport {\n00566:                 ok: true,\n00567:                 operation: \"euint8_lt\".to_owned(),\n00568:                 expected_result: serde_json::json!(expected_result),\n00569:                 output_path: output_path.display().to_string(),\n00570:                 output: to_report(output_path, output),\n00571:             })\n00572:         }\n00573: \n00574:         \"euint32\" => {",
+        "end": 574,
+        "match_line": 568,
+        "start": 562
+      },
+      {
+        "content": "00575:             let output = eval_compare_euint32_external(\n00576:                 &left_path,\n00577:                 &right_path,\n00578:                 &server_key_path,\n00579:                 &output_path,\n00580:                 &expected_key_id,\n00581:                 expected_result,\n00582:             )\n00583:             .await\n00584:             .with_context(|| \"real TFHE eval_compare euint32 failed\")?;\n00585: \n00586:             validate_cipher(\"output\", &output, &expected_key_id, \"ebool\", \"SmallExpanded\")?;\n00587: ",
+        "end": 587,
+        "match_line": 581,
+        "start": 575
+      },
+      {
+        "content": "00585: \n00586:             validate_cipher(\"output\", &output, &expected_key_id, \"ebool\", \"SmallExpanded\")?;\n00587: \n00588:             Ok(EvalSingleReport {\n00589:                 ok: true,\n00590:                 operation: \"euint32_lt\".to_owned(),\n00591:                 expected_result: serde_json::json!(expected_result),\n00592:                 output_path: output_path.display().to_string(),\n00593:                 output: to_report(output_path, output),\n00594:             })\n00595:         }\n00596: \n00597:         other => bail!(\"eval-compare unsupported input data_type {other:?}; expected euint8 or euint32\"),",
+        "end": 597,
+        "match_line": 591,
+        "start": 585
+      },
+      {
+        "content": "00603:     selector_path: PathBuf,\n00604:     true_value_path: PathBuf,\n00605:     false_value_path: PathBuf,\n00606:     server_key_path: PathBuf,\n00607:     output_path: PathBuf,\n00608:     expected_key_id: String,\n00609:     expected_result: u64,\n00610: ) -> Result<EvalSingleReport> {\n00611:     let true_view = read_cipher_with_params_external_view(&true_value_path)\n00612:         .await\n00613:         .with_context(|| format!(\"failed to inspect true_value ciphertext {}\", true_value_path.display()))?;\n00614: \n00615:     match true_view.data_type.as_str() {",
+        "end": 615,
+        "match_line": 609,
+        "start": 603
+      },
+      {
+        "content": "00611:     let true_view = read_cipher_with_params_external_view(&true_value_path)\n00612:         .await\n00613:         .with_context(|| format!(\"failed to inspect true_value ciphertext {}\", true_value_path.display()))?;\n00614: \n00615:     match true_view.data_type.as_str() {\n00616:         \"euint8\" => {\n00617:             let expected_u8: u8 = expected_result\n00618:                 .try_into()\n00619:                 .with_context(|| \"expected_result does not fit euint8\")?;\n00620: \n00621:             let output = eval_select_euint8_external(\n00622:                 &selector_path,\n00623:                 &true_value_path,",
+        "end": 623,
+        "match_line": 617,
+        "start": 611
+      },
+      {
+        "content": "00613:         .with_context(|| format!(\"failed to inspect true_value ciphertext {}\", true_value_path.display()))?;\n00614: \n00615:     match true_view.data_type.as_str() {\n00616:         \"euint8\" => {\n00617:             let expected_u8: u8 = expected_result\n00618:                 .try_into()\n00619:                 .with_context(|| \"expected_result does not fit euint8\")?;\n00620: \n00621:             let output = eval_select_euint8_external(\n00622:                 &selector_path,\n00623:                 &true_value_path,\n00624:                 &false_value_path,\n00625:                 &server_key_path,",
+        "end": 625,
+        "match_line": 619,
+        "start": 613
+      },
+      {
+        "content": "00632: \n00633:             validate_cipher(\"output\", &output, &expected_key_id, \"euint8\", \"SmallExpanded\")?;\n00634: \n00635:             Ok(EvalSingleReport {\n00636:                 ok: true,\n00637:                 operation: \"ebool_cmux_euint8\".to_owned(),\n00638:                 expected_result: serde_json::json!(expected_result),\n00639:                 output_path: output_path.display().to_string(),\n00640:                 output: to_report(output_path, output),\n00641:             })\n00642:         }\n00643: \n00644:         \"euint16\" => {",
+        "end": 644,
+        "match_line": 638,
+        "start": 632
+      },
+      {
+        "content": "00639:                 output_path: output_path.display().to_string(),\n00640:                 output: to_report(output_path, output),\n00641:             })\n00642:         }\n00643: \n00644:         \"euint16\" => {\n00645:             let expected_u16: u16 = expected_result\n00646:                 .try_into()\n00647:                 .with_context(|| \"expected_result does not fit euint16\")?;\n00648: \n00649:             let output = eval_select_euint16_external(\n00650:                 &selector_path,\n00651:                 &true_value_path,",
+        "end": 651,
+        "match_line": 645,
+        "start": 639
+      },
+      {
+        "content": "00641:             })\n00642:         }\n00643: \n00644:         \"euint16\" => {\n00645:             let expected_u16: u16 = expected_result\n00646:                 .try_into()\n00647:                 .with_context(|| \"expected_result does not fit euint16\")?;\n00648: \n00649:             let output = eval_select_euint16_external(\n00650:                 &selector_path,\n00651:                 &true_value_path,\n00652:                 &false_value_path,\n00653:                 &server_key_path,",
+        "end": 653,
+        "match_line": 647,
+        "start": 641
+      },
+      {
+        "content": "00660: \n00661:             validate_cipher(\"output\", &output, &expected_key_id, \"euint16\", \"SmallExpanded\")?;\n00662: \n00663:             Ok(EvalSingleReport {\n00664:                 ok: true,\n00665:                 operation: \"ebool_cmux_euint16\".to_owned(),\n00666:                 expected_result: serde_json::json!(expected_result),\n00667:                 output_path: output_path.display().to_string(),\n00668:                 output: to_report(output_path, output),\n00669:             })\n00670:         }\n00671: \n00672:         other => bail!(\"eval-select unsupported true_value data_type {other:?}; expected euint8 or euint16\"),",
+        "end": 672,
+        "match_line": 666,
+        "start": 660
+      },
+      {
+        "content": "00675: \n00676: async fn eval_locate_command(\n00677:     values: Vec<PathBuf>,\n00678:     server_key_path: PathBuf,\n00679:     output_dir: PathBuf,\n00680:     expected_key_id: String,\n00681:     expected_index: usize,\n00682: ) -> Result<EvalVectorReport> {\n00683:     let outputs = eval_locate_min_euint8_external(\n00684:         &values,\n00685:         &server_key_path,\n00686:         &output_dir,\n00687:         &expected_key_id,",
+        "end": 687,
+        "match_line": 681,
+        "start": 675
+      },
+      {
+        "content": "00682: ) -> Result<EvalVectorReport> {\n00683:     let outputs = eval_locate_min_euint8_external(\n00684:         &values,\n00685:         &server_key_path,\n00686:         &output_dir,\n00687:         &expected_key_id,\n00688:         expected_index,\n00689:     )\n00690:     .await\n00691:     .with_context(|| \"real TFHE eval_locate failed\")?;\n00692: \n00693:     let mut reports = Vec::with_capacity(outputs.len());\n00694: ",
+        "end": 694,
+        "match_line": 688,
+        "start": 682
+      },
+      {
+        "content": "00707:         ));\n00708:     }\n00709: \n00710:     Ok(EvalVectorReport {\n00711:         ok: true,\n00712:         operation: \"euint8_argmin_onehot\".to_owned(),\n00713:         expected_index,\n00714:         output_dir: output_dir.display().to_string(),\n00715:         outputs: reports,\n00716:     })\n00717: }\n00718: \n00719: async fn eval_locate_bool_command(",
+        "end": 719,
+        "match_line": 713,
+        "start": 707
+      },
+      {
+        "content": "00718: \n00719: async fn eval_locate_bool_command(\n00720:     flags: Vec<PathBuf>,\n00721:     server_key_path: PathBuf,\n00722:     output_dir: PathBuf,\n00723:     expected_key_id: String,\n00724:     expected_index: usize,\n00725: ) -> Result<EvalVectorReport> {\n00726:     let outputs = eval_locate_first_true_ebool_external(\n00727:         &flags,\n00728:         &server_key_path,\n00729:         &output_dir,\n00730:         &expected_key_id,",
+        "end": 730,
+        "match_line": 724,
+        "start": 718
+      },
+      {
+        "content": "00725: ) -> Result<EvalVectorReport> {\n00726:     let outputs = eval_locate_first_true_ebool_external(\n00727:         &flags,\n00728:         &server_key_path,\n00729:         &output_dir,\n00730:         &expected_key_id,\n00731:         expected_index,\n00732:     )\n00733:     .await\n00734:     .with_context(|| \"real TFHE eval_locate_bool failed\")?;\n00735: \n00736:     let mut reports = Vec::with_capacity(outputs.len());\n00737: ",
+        "end": 737,
+        "match_line": 731,
+        "start": 725
+      },
+      {
+        "content": "00750:         ));\n00751:     }\n00752: \n00753:     Ok(EvalVectorReport {\n00754:         ok: true,\n00755:         operation: \"ebool_first_true_onehot\".to_owned(),\n00756:         expected_index,\n00757:         output_dir: output_dir.display().to_string(),\n00758:         outputs: reports,\n00759:     })\n00760: }\n00761: \n00762: fn validate_cipher(",
+        "end": 762,
+        "match_line": 756,
+        "start": 750
+      }
+    ],
+    "expected_matches": [
+      {
+        "line": 51,
+        "text": "        expected_result: u64,"
+      },
+      {
+        "line": 68,
+        "text": "        expected_result: u64,"
+      },
+      {
+        "line": 83,
+        "text": "        expected_result: String,"
+      },
+      {
+        "line": 100,
+        "text": "        expected_result: u64,"
+      },
+      {
+        "line": 113,
+        "text": "        expected_index: usize,"
+      },
+      {
+        "line": 126,
+        "text": "        expected_index: usize,"
+      },
+      {
+        "line": 165,
+        "text": "    expected_result: serde_json::Value,"
+      },
+      {
+        "line": 174,
+        "text": "    expected_index: usize,"
+      },
+      {
+        "line": 210,
+        "text": "            expected_result,"
+      },
+      {
+        "line": 218,
+        "text": "                expected_result,"
+      },
+      {
+        "line": 231,
+        "text": "            expected_result,"
+      },
+      {
+        "line": 240,
+        "text": "                expected_result,"
+      },
+      {
+        "line": 252,
+        "text": "            expected_result,"
+      },
+      {
+        "line": 254,
+        "text": "            let expected_result = parse_expected_result(&expected_result)?;"
+      },
+      {
+        "line": 261,
+        "text": "                expected_result,"
+      },
+      {
+        "line": 274,
+        "text": "            expected_result,"
+      },
+      {
+        "line": 283,
+        "text": "                expected_result,"
+      },
+      {
+        "line": 294,
+        "text": "            expected_index,"
+      },
+      {
+        "line": 301,
+        "text": "                expected_index,"
+      },
+      {
+        "line": 312,
+        "text": "            expected_index,"
+      },
+      {
+        "line": 319,
+        "text": "                expected_index,"
+      },
+      {
+        "line": 376,
+        "text": "fn parse_expected_result(value: &str) -> Result<bool> {"
+      },
+      {
+        "line": 380,
+        "text": "        other => bail!(\"invalid --expected-result value {other:?}; use true/false or 1/0\"),"
+      },
+      {
+        "line": 391,
+        "text": "    expected_result: u64,"
+      },
+      {
+        "line": 399,
+        "text": "            let expected_u8: u8 = expected_result"
+      },
+      {
+        "line": 401,
+        "text": "                .with_context(|| \"expected_result does not fit euint8\")?;"
+      },
+      {
+        "line": 419,
+        "text": "                expected_result: serde_json::json!(expected_result),"
+      },
+      {
+        "line": 426,
+        "text": "            let expected_u32: u32 = expected_result"
+      },
+      {
+        "line": 428,
+        "text": "                .with_context(|| \"expected_result does not fit euint32\")?;"
+      },
+      {
+        "line": 446,
+        "text": "                expected_result: serde_json::json!(expected_result),"
+      },
+      {
+        "line": 464,
+        "text": "    expected_result: u64,"
+      },
+      {
+        "line": 478,
+        "text": "            let expected_u8: u8 = expected_result"
+      },
+      {
+        "line": 480,
+        "text": "                .with_context(|| \"expected_result does not fit euint8\")?;"
+      },
+      {
+        "line": 499,
+        "text": "                expected_result: serde_json::json!(expected_result),"
+      },
+      {
+        "line": 506,
+        "text": "            let expected_u32: u32 = expected_result"
+      },
+      {
+        "line": 508,
+        "text": "                .with_context(|| \"expected_result does not fit euint32\")?;"
+      },
+      {
+        "line": 527,
+        "text": "                expected_result: serde_json::json!(expected_result),"
+      },
+      {
+        "line": 544,
+        "text": "    expected_result: bool,"
+      },
+      {
+        "line": 558,
+        "text": "                expected_result,"
+      },
+      {
+        "line": 568,
+        "text": "                expected_result: serde_json::json!(expected_result),"
+      },
+      {
+        "line": 581,
+        "text": "                expected_result,"
+      },
+      {
+        "line": 591,
+        "text": "                expected_result: serde_json::json!(expected_result),"
+      },
+      {
+        "line": 609,
+        "text": "    expected_result: u64,"
+      },
+      {
+        "line": 617,
+        "text": "            let expected_u8: u8 = expected_result"
+      },
+      {
+        "line": 619,
+        "text": "                .with_context(|| \"expected_result does not fit euint8\")?;"
+      },
+      {
+        "line": 638,
+        "text": "                expected_result: serde_json::json!(expected_result),"
+      },
+      {
+        "line": 645,
+        "text": "            let expected_u16: u16 = expected_result"
+      },
+      {
+        "line": 647,
+        "text": "                .with_context(|| \"expected_result does not fit euint16\")?;"
+      },
+      {
+        "line": 666,
+        "text": "                expected_result: serde_json::json!(expected_result),"
+      },
+      {
+        "line": 681,
+        "text": "    expected_index: usize,"
+      },
+      {
+        "line": 688,
+        "text": "        expected_index,"
+      },
+      {
+        "line": 713,
+        "text": "        expected_index,"
+      },
+      {
+        "line": 724,
+        "text": "    expected_index: usize,"
+      },
+      {
+        "line": 731,
+        "text": "        expected_index,"
+      },
+      {
+        "line": 756,
+        "text": "        expected_index,"
+      }
+    ]
+  },
+  "/mnt/d/biancheng/pycharm/scientific_project/kms/core-client/src/lib.rs": {
+    "command_context": [
+      {
+        "content": "02587: // they are SmallExpanded euint8 ciphertexts for the same key, deserializes the\n02588: // inner high-level FheUint8 ciphertexts, loads the real KMS ServerKey, evaluates\n02589: // left < right with tfhe-rs, and writes an ebool CipherWithParams file.\n02590: //\n02591: // No plaintext value is read from encoded_value or used for the comparison.\n02592: \n02593: \n02594: \n02595: \n02596: \n02597: pub async fn eval_compare_euint8_external<P: AsRef<std::path::Path>>(\n02598:     left_path: P,\n02599:     right_path: P,\n02600:     server_key_path: P,\n02601:     output_path: P,\n02602:     expected_key_id: &str,\n02603:     expected_result: bool,\n02604: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n02605:     use std::io::Cursor;\n02606:     use tfhe::prelude::*;\n02607:     use tfhe::{FheUint8, ServerKey};",
+        "end": 2607,
+        "match_line": 2597,
+        "start": 2587
+      },
+      {
+        "content": "02637: \n02638:     if left.ct_format != \"SmallExpanded\" {\n02639:         anyhow::bail!(\"left ct_format must be SmallExpanded, got {}\", left.ct_format);\n02640:     }\n02641: \n02642:     if right.ct_format != \"SmallExpanded\" {\n02643:         anyhow::bail!(\"right ct_format must be SmallExpanded, got {}\", right.ct_format);\n02644:     }\n02645: \n02646:     if !left.params.no_compression || !right.params.no_compression {\n02647:         anyhow::bail!(\"eval_compare_euint8_external requires --no-compression inputs\");\n02648:     }\n02649: \n02650:     if !left.params.no_precompute_sns || !right.params.no_precompute_sns {\n02651:         anyhow::bail!(\"eval_compare_euint8_external requires --no-precompute-sns inputs\");\n02652:     }\n02653: \n02654:     let left_ct: FheUint8 = tfhe::safe_serialization::safe_deserialize(\n02655:         Cursor::new(left.cipher.as_slice()),\n02656:         POS_SAFE_SER_SIZE_LIMIT,\n02657:     )",
+        "end": 2657,
+        "match_line": 2647,
+        "start": 2637
+      },
+      {
+        "content": "02641: \n02642:     if right.ct_format != \"SmallExpanded\" {\n02643:         anyhow::bail!(\"right ct_format must be SmallExpanded, got {}\", right.ct_format);\n02644:     }\n02645: \n02646:     if !left.params.no_compression || !right.params.no_compression {\n02647:         anyhow::bail!(\"eval_compare_euint8_external requires --no-compression inputs\");\n02648:     }\n02649: \n02650:     if !left.params.no_precompute_sns || !right.params.no_precompute_sns {\n02651:         anyhow::bail!(\"eval_compare_euint8_external requires --no-precompute-sns inputs\");\n02652:     }\n02653: \n02654:     let left_ct: FheUint8 = tfhe::safe_serialization::safe_deserialize(\n02655:         Cursor::new(left.cipher.as_slice()),\n02656:         POS_SAFE_SER_SIZE_LIMIT,\n02657:     )\n02658:     .map_err(|err| anyhow::anyhow!(\"failed to deserialize left FheUint8: {err}\"))?;\n02659: \n02660:     let right_ct: FheUint8 = tfhe::safe_serialization::safe_deserialize(\n02661:         Cursor::new(right.cipher.as_slice()),",
+        "end": 2661,
+        "match_line": 2651,
+        "start": 2641
+      },
+      {
+        "content": "02806: // - selector: SmallExpanded ebool CipherWithParams\n02807: // - true_value: SmallExpanded euint8 CipherWithParams\n02808: // - false_value: SmallExpanded euint8 CipherWithParams\n02809: //\n02810: // Output:\n02811: // - SmallExpanded euint8 CipherWithParams\n02812: //\n02813: // No plaintext selector fallback is used. The selected ciphertext is produced\n02814: // by TFHE high-level FheBool::if_then_else.\n02815: \n02816: pub async fn eval_select_euint8_external<P: AsRef<std::path::Path>>(\n02817:     selector_path: P,\n02818:     true_value_path: P,\n02819:     false_value_path: P,\n02820:     server_key_path: P,\n02821:     output_path: P,\n02822:     expected_key_id: &str,\n02823:     expected_result: u8,\n02824: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n02825:     use std::io::Cursor;\n02826:     use tfhe::prelude::*;",
+        "end": 2826,
+        "match_line": 2816,
+        "start": 2806
+      },
+      {
+        "content": "02940: // Given encrypted euint8 values [v0, v1, ...], this computes the index of the\n02941: // first minimum value and returns one-hot encrypted ebool flags.\n02942: //\n02943: // Tie policy:\n02944: // - strict less-than update\n02945: // - equal values keep the earlier winner\n02946: //\n02947: // No plaintext fallback is used. Expected index is only test metadata used by\n02948: // kms-core-client decrypt-from-file validation.\n02949: \n02950: pub async fn eval_locate_min_euint8_external(\n02951:     value_paths: &[std::path::PathBuf],\n02952:     server_key_path: &std::path::Path,\n02953:     output_dir: &std::path::Path,\n02954:     expected_key_id: &str,\n02955:     expected_index: usize,\n02956: ) -> anyhow::Result<Vec<ExternalCipherWithParamsView>> {\n02957:     use std::io::Cursor;\n02958:     use tfhe::prelude::*;\n02959:     use tfhe::{FheBool, FheUint8, ServerKey};\n02960: ",
+        "end": 2960,
+        "match_line": 2950,
+        "start": 2940
+      },
+      {
+        "content": "02954:     expected_key_id: &str,\n02955:     expected_index: usize,\n02956: ) -> anyhow::Result<Vec<ExternalCipherWithParamsView>> {\n02957:     use std::io::Cursor;\n02958:     use tfhe::prelude::*;\n02959:     use tfhe::{FheBool, FheUint8, ServerKey};\n02960: \n02961:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;\n02962: \n02963:     if value_paths.is_empty() {\n02964:         anyhow::bail!(\"eval_locate_min_euint8_external requires at least one value\");\n02965:     }\n02966: \n02967:     if expected_index >= value_paths.len() {\n02968:         anyhow::bail!(\n02969:             \"expected_index {} out of range for {} values\",\n02970:             expected_index,\n02971:             value_paths.len()\n02972:         );\n02973:     }\n02974: ",
+        "end": 2974,
+        "match_line": 2964,
+        "start": 2954
+      },
+      {
+        "content": "03111: \n03112: \n03113: // -----------------------------------------------------------------------------\n03114: // External evaluator support: real TFHE euint8 addition.\n03115: // -----------------------------------------------------------------------------\n03116: //\n03117: // Used by the patent step-18 path to build encrypted cumulative stake sums.\n03118: // expected_result is test metadata only for kms-core-client decrypt-from-file\n03119: // validation. The addition itself is computed by TFHE over ciphertexts.\n03120: \n03121: pub async fn eval_add_euint8_external<P: AsRef<std::path::Path>>(\n03122:     left_path: P,\n03123:     right_path: P,\n03124:     server_key_path: P,\n03125:     output_path: P,\n03126:     expected_key_id: &str,\n03127:     expected_result: u8,\n03128: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03129:     use std::io::Cursor;\n03130:     use tfhe::prelude::*;\n03131:     use tfhe::{FheUint8, ServerKey};",
+        "end": 3131,
+        "match_line": 3121,
+        "start": 3111
+      },
+      {
+        "content": "03221: \n03222: \n03223: // -----------------------------------------------------------------------------\n03224: // External evaluator support: real TFHE bool locate / one-hot first-true.\n03225: // -----------------------------------------------------------------------------\n03226: //\n03227: // Given encrypted ebool flags [b0, b1, ...], compute one-hot encrypted flags\n03228: // [b0, !b0 & b1, !b0 & !b1 & b2, ...].\n03229: // This matches the patent Clocate step over Ccompare output.\n03230: \n03231: pub async fn eval_locate_first_true_ebool_external(\n03232:     flag_paths: &[std::path::PathBuf],\n03233:     server_key_path: &std::path::Path,\n03234:     output_dir: &std::path::Path,\n03235:     expected_key_id: &str,\n03236:     expected_index: usize,\n03237: ) -> anyhow::Result<Vec<ExternalCipherWithParamsView>> {\n03238:     use std::io::Cursor;\n03239:     use tfhe::prelude::*;\n03240:     use tfhe::{FheBool, ServerKey};\n03241: ",
+        "end": 3241,
+        "match_line": 3231,
+        "start": 3221
+      },
+      {
+        "content": "03235:     expected_key_id: &str,\n03236:     expected_index: usize,\n03237: ) -> anyhow::Result<Vec<ExternalCipherWithParamsView>> {\n03238:     use std::io::Cursor;\n03239:     use tfhe::prelude::*;\n03240:     use tfhe::{FheBool, ServerKey};\n03241: \n03242:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;\n03243: \n03244:     if flag_paths.is_empty() {\n03245:         anyhow::bail!(\"eval_locate_first_true_ebool_external requires at least one flag\");\n03246:     }\n03247: \n03248:     if expected_index >= flag_paths.len() {\n03249:         anyhow::bail!(\n03250:             \"expected_index {} out of range for {} flags\",\n03251:             expected_index,\n03252:             flag_paths.len()\n03253:         );\n03254:     }\n03255: ",
+        "end": 3255,
+        "match_line": 3245,
+        "start": 3235
+      },
+      {
+        "content": "03375: // -----------------------------------------------------------------------------\n03376: //\n03377: // Computes:\n03378: //   floor(prf_ciphertext * numerator / denominator)\n03379: //\n03380: // Current Stage-9 strict path uses euint8 ciphertext inputs and widens to\n03381: // FheUint16 inside the TFHE circuit before multiplying/dividing by public\n03382: // constants. expected_result is test metadata only for kms-core-client\n03383: // decrypt-from-file validation.\n03384: \n03385: pub async fn eval_scale_prf_euint8_external<P: AsRef<std::path::Path>>(\n03386:     prf_path: P,\n03387:     server_key_path: P,\n03388:     output_path: P,\n03389:     expected_key_id: &str,\n03390:     numerator: u16,\n03391:     denominator: u16,\n03392:     expected_result: u8,\n03393: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03394:     use std::io::Cursor;\n03395:     use tfhe::prelude::*;",
+        "end": 3395,
+        "match_line": 3385,
+        "start": 3375
+      },
+      {
+        "content": "03482:     read_cipher_with_params_external_view(output_path).await\n03483: }\n03484: \n03485: // -----------------------------------------------------------------------------\n03486: // External evaluator support: real TFHE euint32 comparison.\n03487: // -----------------------------------------------------------------------------\n03488: //\n03489: // Used by the strict patent path for Ccompare over scaled random and cumulative\n03490: // stake ciphertexts. No plaintext fallback is used.\n03491: \n03492: pub async fn eval_compare_euint32_external<P: AsRef<std::path::Path>>(\n03493:     left_path: P,\n03494:     right_path: P,\n03495:     server_key_path: P,\n03496:     output_path: P,\n03497:     expected_key_id: &str,\n03498:     expected_result: bool,\n03499: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03500:     use std::io::Cursor;\n03501:     use tfhe::prelude::*;\n03502:     use tfhe::{FheUint32, ServerKey};",
+        "end": 3502,
+        "match_line": 3492,
+        "start": 3482
+      },
+      {
+        "content": "03592:     read_cipher_with_params_external_view(output_path).await\n03593: }\n03594: \n03595: // -----------------------------------------------------------------------------\n03596: // External evaluator support: real TFHE euint32 addition.\n03597: // -----------------------------------------------------------------------------\n03598: //\n03599: // Used by patent steps 12 and 16 to sum encrypted stakes and encrypted PRF\n03600: // shares in the election arithmetic domain.\n03601: \n03602: pub async fn eval_add_euint32_external<P: AsRef<std::path::Path>>(\n03603:     left_path: P,\n03604:     right_path: P,\n03605:     server_key_path: P,\n03606:     output_path: P,\n03607:     expected_key_id: &str,\n03608:     expected_result: u32,\n03609: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03610:     use std::io::Cursor;\n03611:     use tfhe::prelude::*;\n03612:     use tfhe::{FheUint32, ServerKey};",
+        "end": 3612,
+        "match_line": 3602,
+        "start": 3592
+      },
+      {
+        "content": "03697: \n03698:     read_cipher_with_params_external_view(output_path).await\n03699: }\n03700: \n03701: // -----------------------------------------------------------------------------\n03702: // External evaluator support: real TFHE euint16 conditional select / CMUX.\n03703: // -----------------------------------------------------------------------------\n03704: //\n03705: // Used by patent step 18 to select encrypted ticket-hash suffix chunks.\n03706: \n03707: pub async fn eval_select_euint16_external<P: AsRef<std::path::Path>>(\n03708:     selector_path: P,\n03709:     true_value_path: P,\n03710:     false_value_path: P,\n03711:     server_key_path: P,\n03712:     output_path: P,\n03713:     expected_key_id: &str,\n03714:     expected_result: u16,\n03715: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03716:     use std::io::Cursor;\n03717:     use tfhe::prelude::*;",
+        "end": 3717,
+        "match_line": 3707,
+        "start": 3697
+      },
+      {
+        "content": "03819:     read_cipher_with_params_external_view(output_path).await\n03820: }\n03821: \n03822: // -----------------------------------------------------------------------------\n03823: // External evaluator support: real TFHE euint32 PRF scaling.\n03824: // -----------------------------------------------------------------------------\n03825: //\n03826: // Computes floor(prf_ciphertext * numerator / denominator) in an internal\n03827: // euint64 circuit, then casts back to euint32. This is used by patent step 17.\n03828: \n03829: pub async fn eval_scale_prf_euint32_external<P: AsRef<std::path::Path>>(\n03830:     prf_path: P,\n03831:     server_key_path: P,\n03832:     output_path: P,\n03833:     expected_key_id: &str,\n03834:     numerator: u64,\n03835:     denominator: u64,\n03836:     expected_result: u32,\n03837: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03838:     use std::io::Cursor;\n03839:     use tfhe::prelude::*;",
+        "end": 3839,
+        "match_line": 3829,
+        "start": 3819
+      }
+    ],
+    "expected_context": [
+      {
+        "content": "02597: pub async fn eval_compare_euint8_external<P: AsRef<std::path::Path>>(\n02598:     left_path: P,\n02599:     right_path: P,\n02600:     server_key_path: P,\n02601:     output_path: P,\n02602:     expected_key_id: &str,\n02603:     expected_result: bool,\n02604: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n02605:     use std::io::Cursor;\n02606:     use tfhe::prelude::*;\n02607:     use tfhe::{FheUint8, ServerKey};\n02608: \n02609:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;",
+        "end": 2609,
+        "match_line": 2603,
+        "start": 2597
+      },
+      {
+        "content": "02684:     .map_err(|err| anyhow::anyhow!(\"failed to serialize comparison FheBool: {err}\"))?;\n02685: \n02686:     let mut params = left.params.clone();\n02687: \n02688:     // This field is only KMS core-client test metadata.\n02689:     // The actual homomorphic comparison above never reads this value.\n02690:     params.to_encrypt = if expected_result {\n02691:         \"01\".to_owned()\n02692:     } else {\n02693:         \"00\".to_owned()\n02694:     };\n02695: \n02696:     params.data_type = FheType::Ebool;",
+        "end": 2696,
+        "match_line": 2690,
+        "start": 2684
+      },
+      {
+        "content": "02817:     selector_path: P,\n02818:     true_value_path: P,\n02819:     false_value_path: P,\n02820:     server_key_path: P,\n02821:     output_path: P,\n02822:     expected_key_id: &str,\n02823:     expected_result: u8,\n02824: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n02825:     use std::io::Cursor;\n02826:     use tfhe::prelude::*;\n02827:     use tfhe::{FheBool, FheUint8, ServerKey};\n02828: \n02829:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;",
+        "end": 2829,
+        "match_line": 2823,
+        "start": 2817
+      },
+      {
+        "content": "02907:     )\n02908:     .map_err(|err| anyhow::anyhow!(\"failed to serialize selected FheUint8: {err}\"))?;\n02909: \n02910:     let mut params = true_value.params.clone();\n02911: \n02912:     // Test metadata only. The actual CMUX above never reads this value.\n02913:     params.to_encrypt = format!(\"{expected_result:02x}\");\n02914:     params.data_type = FheType::Euint8;\n02915:     params.no_compression = true;\n02916:     params.no_precompute_sns = true;\n02917:     params.ciphertext_output_path = None;\n02918:     params.batch_size = 1;\n02919:     params.num_requests = 1;",
+        "end": 2919,
+        "match_line": 2913,
+        "start": 2907
+      },
+      {
+        "content": "02949: \n02950: pub async fn eval_locate_min_euint8_external(\n02951:     value_paths: &[std::path::PathBuf],\n02952:     server_key_path: &std::path::Path,\n02953:     output_dir: &std::path::Path,\n02954:     expected_key_id: &str,\n02955:     expected_index: usize,\n02956: ) -> anyhow::Result<Vec<ExternalCipherWithParamsView>> {\n02957:     use std::io::Cursor;\n02958:     use tfhe::prelude::*;\n02959:     use tfhe::{FheBool, FheUint8, ServerKey};\n02960: \n02961:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;",
+        "end": 2961,
+        "match_line": 2955,
+        "start": 2949
+      },
+      {
+        "content": "02961:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;\n02962: \n02963:     if value_paths.is_empty() {\n02964:         anyhow::bail!(\"eval_locate_min_euint8_external requires at least one value\");\n02965:     }\n02966: \n02967:     if expected_index >= value_paths.len() {\n02968:         anyhow::bail!(\n02969:             \"expected_index {} out of range for {} values\",\n02970:             expected_index,\n02971:             value_paths.len()\n02972:         );\n02973:     }",
+        "end": 2973,
+        "match_line": 2967,
+        "start": 2961
+      },
+      {
+        "content": "02963:     if value_paths.is_empty() {\n02964:         anyhow::bail!(\"eval_locate_min_euint8_external requires at least one value\");\n02965:     }\n02966: \n02967:     if expected_index >= value_paths.len() {\n02968:         anyhow::bail!(\n02969:             \"expected_index {} out of range for {} values\",\n02970:             expected_index,\n02971:             value_paths.len()\n02972:         );\n02973:     }\n02974: \n02975:     let mut values_with_params: Vec<CipherWithParams> = Vec::with_capacity(value_paths.len());",
+        "end": 2975,
+        "match_line": 2969,
+        "start": 2963
+      },
+      {
+        "content": "02964:         anyhow::bail!(\"eval_locate_min_euint8_external requires at least one value\");\n02965:     }\n02966: \n02967:     if expected_index >= value_paths.len() {\n02968:         anyhow::bail!(\n02969:             \"expected_index {} out of range for {} values\",\n02970:             expected_index,\n02971:             value_paths.len()\n02972:         );\n02973:     }\n02974: \n02975:     let mut values_with_params: Vec<CipherWithParams> = Vec::with_capacity(value_paths.len());\n02976:     let mut value_cts: Vec<FheUint8> = Vec::with_capacity(value_paths.len());",
+        "end": 2976,
+        "match_line": 2970,
+        "start": 2964
+      },
+      {
+        "content": "03059:         )\n03060:         .map_err(|err| anyhow::anyhow!(\"failed to serialize locate flag[{idx}] FheBool: {err}\"))?;\n03061: \n03062:         let mut params = values_with_params[0].params.clone();\n03063: \n03064:         // Test metadata only. The actual locate circuit above never reads this.\n03065:         params.to_encrypt = if idx == expected_index {\n03066:             \"01\".to_owned()\n03067:         } else {\n03068:             \"00\".to_owned()\n03069:         };\n03070: \n03071:         params.data_type = FheType::Ebool;",
+        "end": 3071,
+        "match_line": 3065,
+        "start": 3059
+      },
+      {
+        "content": "03112: \n03113: // -----------------------------------------------------------------------------\n03114: // External evaluator support: real TFHE euint8 addition.\n03115: // -----------------------------------------------------------------------------\n03116: //\n03117: // Used by the patent step-18 path to build encrypted cumulative stake sums.\n03118: // expected_result is test metadata only for kms-core-client decrypt-from-file\n03119: // validation. The addition itself is computed by TFHE over ciphertexts.\n03120: \n03121: pub async fn eval_add_euint8_external<P: AsRef<std::path::Path>>(\n03122:     left_path: P,\n03123:     right_path: P,\n03124:     server_key_path: P,",
+        "end": 3124,
+        "match_line": 3118,
+        "start": 3112
+      },
+      {
+        "content": "03121: pub async fn eval_add_euint8_external<P: AsRef<std::path::Path>>(\n03122:     left_path: P,\n03123:     right_path: P,\n03124:     server_key_path: P,\n03125:     output_path: P,\n03126:     expected_key_id: &str,\n03127:     expected_result: u8,\n03128: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03129:     use std::io::Cursor;\n03130:     use tfhe::prelude::*;\n03131:     use tfhe::{FheUint8, ServerKey};\n03132: \n03133:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;",
+        "end": 3133,
+        "match_line": 3127,
+        "start": 3121
+      },
+      {
+        "content": "03193:     )\n03194:     .map_err(|err| anyhow::anyhow!(\"failed to serialize sum FheUint8: {err}\"))?;\n03195: \n03196:     let mut params = left.params.clone();\n03197: \n03198:     // Test metadata only. The actual encrypted addition above never reads this.\n03199:     params.to_encrypt = format!(\"{expected_result:02x}\");\n03200:     params.data_type = FheType::Euint8;\n03201:     params.no_compression = true;\n03202:     params.no_precompute_sns = true;\n03203:     params.ciphertext_output_path = None;\n03204:     params.batch_size = 1;\n03205:     params.num_requests = 1;",
+        "end": 3205,
+        "match_line": 3199,
+        "start": 3193
+      },
+      {
+        "content": "03230: \n03231: pub async fn eval_locate_first_true_ebool_external(\n03232:     flag_paths: &[std::path::PathBuf],\n03233:     server_key_path: &std::path::Path,\n03234:     output_dir: &std::path::Path,\n03235:     expected_key_id: &str,\n03236:     expected_index: usize,\n03237: ) -> anyhow::Result<Vec<ExternalCipherWithParamsView>> {\n03238:     use std::io::Cursor;\n03239:     use tfhe::prelude::*;\n03240:     use tfhe::{FheBool, ServerKey};\n03241: \n03242:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;",
+        "end": 3242,
+        "match_line": 3236,
+        "start": 3230
+      },
+      {
+        "content": "03242:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;\n03243: \n03244:     if flag_paths.is_empty() {\n03245:         anyhow::bail!(\"eval_locate_first_true_ebool_external requires at least one flag\");\n03246:     }\n03247: \n03248:     if expected_index >= flag_paths.len() {\n03249:         anyhow::bail!(\n03250:             \"expected_index {} out of range for {} flags\",\n03251:             expected_index,\n03252:             flag_paths.len()\n03253:         );\n03254:     }",
+        "end": 3254,
+        "match_line": 3248,
+        "start": 3242
+      },
+      {
+        "content": "03244:     if flag_paths.is_empty() {\n03245:         anyhow::bail!(\"eval_locate_first_true_ebool_external requires at least one flag\");\n03246:     }\n03247: \n03248:     if expected_index >= flag_paths.len() {\n03249:         anyhow::bail!(\n03250:             \"expected_index {} out of range for {} flags\",\n03251:             expected_index,\n03252:             flag_paths.len()\n03253:         );\n03254:     }\n03255: \n03256:     let mut flags_with_params: Vec<CipherWithParams> = Vec::with_capacity(flag_paths.len());",
+        "end": 3256,
+        "match_line": 3250,
+        "start": 3244
+      },
+      {
+        "content": "03245:         anyhow::bail!(\"eval_locate_first_true_ebool_external requires at least one flag\");\n03246:     }\n03247: \n03248:     if expected_index >= flag_paths.len() {\n03249:         anyhow::bail!(\n03250:             \"expected_index {} out of range for {} flags\",\n03251:             expected_index,\n03252:             flag_paths.len()\n03253:         );\n03254:     }\n03255: \n03256:     let mut flags_with_params: Vec<CipherWithParams> = Vec::with_capacity(flag_paths.len());\n03257:     let mut flag_cts: Vec<FheBool> = Vec::with_capacity(flag_paths.len());",
+        "end": 3257,
+        "match_line": 3251,
+        "start": 3245
+      },
+      {
+        "content": "03334:         )\n03335:         .map_err(|err| anyhow::anyhow!(\"failed to serialize locate bool flag[{idx}] FheBool: {err}\"))?;\n03336: \n03337:         let mut params = flags_with_params[0].params.clone();\n03338: \n03339:         // Test metadata only. The actual locate circuit above never reads this.\n03340:         params.to_encrypt = if idx == expected_index {\n03341:             \"01\".to_owned()\n03342:         } else {\n03343:             \"00\".to_owned()\n03344:         };\n03345: \n03346:         params.data_type = FheType::Ebool;",
+        "end": 3346,
+        "match_line": 3340,
+        "start": 3334
+      },
+      {
+        "content": "03376: //\n03377: // Computes:\n03378: //   floor(prf_ciphertext * numerator / denominator)\n03379: //\n03380: // Current Stage-9 strict path uses euint8 ciphertext inputs and widens to\n03381: // FheUint16 inside the TFHE circuit before multiplying/dividing by public\n03382: // constants. expected_result is test metadata only for kms-core-client\n03383: // decrypt-from-file validation.\n03384: \n03385: pub async fn eval_scale_prf_euint8_external<P: AsRef<std::path::Path>>(\n03386:     prf_path: P,\n03387:     server_key_path: P,\n03388:     output_path: P,",
+        "end": 3388,
+        "match_line": 3382,
+        "start": 3376
+      },
+      {
+        "content": "03386:     prf_path: P,\n03387:     server_key_path: P,\n03388:     output_path: P,\n03389:     expected_key_id: &str,\n03390:     numerator: u16,\n03391:     denominator: u16,\n03392:     expected_result: u8,\n03393: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03394:     use std::io::Cursor;\n03395:     use tfhe::prelude::*;\n03396:     use tfhe::{FheUint8, FheUint16, ServerKey};\n03397: \n03398:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;",
+        "end": 3398,
+        "match_line": 3392,
+        "start": 3386
+      },
+      {
+        "content": "03456:     )\n03457:     .map_err(|err| anyhow::anyhow!(\"failed to serialize scaled PRF FheUint8: {err}\"))?;\n03458: \n03459:     let mut params = prf.params.clone();\n03460: \n03461:     // Test metadata only. The encrypted scaling circuit above never reads this.\n03462:     params.to_encrypt = format!(\"{expected_result:02x}\");\n03463:     params.data_type = FheType::Euint8;\n03464:     params.no_compression = true;\n03465:     params.no_precompute_sns = true;\n03466:     params.ciphertext_output_path = None;\n03467:     params.batch_size = 1;\n03468:     params.num_requests = 1;",
+        "end": 3468,
+        "match_line": 3462,
+        "start": 3456
+      },
+      {
+        "content": "03492: pub async fn eval_compare_euint32_external<P: AsRef<std::path::Path>>(\n03493:     left_path: P,\n03494:     right_path: P,\n03495:     server_key_path: P,\n03496:     output_path: P,\n03497:     expected_key_id: &str,\n03498:     expected_result: bool,\n03499: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03500:     use std::io::Cursor;\n03501:     use tfhe::prelude::*;\n03502:     use tfhe::{FheUint32, ServerKey};\n03503: \n03504:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;",
+        "end": 3504,
+        "match_line": 3498,
+        "start": 3492
+      },
+      {
+        "content": "03562:         &mut compare_buf,\n03563:         POS_SAFE_SER_SIZE_LIMIT,\n03564:     )\n03565:     .map_err(|err| anyhow::anyhow!(\"failed to serialize comparison FheBool: {err}\"))?;\n03566: \n03567:     let mut params = left.params.clone();\n03568:     params.to_encrypt = if expected_result {\n03569:         \"01\".to_owned()\n03570:     } else {\n03571:         \"00\".to_owned()\n03572:     };\n03573:     params.data_type = FheType::Ebool;\n03574:     params.no_compression = true;",
+        "end": 3574,
+        "match_line": 3568,
+        "start": 3562
+      },
+      {
+        "content": "03602: pub async fn eval_add_euint32_external<P: AsRef<std::path::Path>>(\n03603:     left_path: P,\n03604:     right_path: P,\n03605:     server_key_path: P,\n03606:     output_path: P,\n03607:     expected_key_id: &str,\n03608:     expected_result: u32,\n03609: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03610:     use std::io::Cursor;\n03611:     use tfhe::prelude::*;\n03612:     use tfhe::{FheUint32, ServerKey};\n03613: \n03614:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;",
+        "end": 3614,
+        "match_line": 3608,
+        "start": 3602
+      },
+      {
+        "content": "03672:         &mut sum_buf,\n03673:         POS_SAFE_SER_SIZE_LIMIT,\n03674:     )\n03675:     .map_err(|err| anyhow::anyhow!(\"failed to serialize sum FheUint32: {err}\"))?;\n03676: \n03677:     let mut params = left.params.clone();\n03678:     params.to_encrypt = format!(\"{expected_result:08x}\");\n03679:     params.data_type = FheType::Euint32;\n03680:     params.no_compression = true;\n03681:     params.no_precompute_sns = true;\n03682:     params.ciphertext_output_path = None;\n03683:     params.batch_size = 1;\n03684:     params.num_requests = 1;",
+        "end": 3684,
+        "match_line": 3678,
+        "start": 3672
+      },
+      {
+        "content": "03708:     selector_path: P,\n03709:     true_value_path: P,\n03710:     false_value_path: P,\n03711:     server_key_path: P,\n03712:     output_path: P,\n03713:     expected_key_id: &str,\n03714:     expected_result: u16,\n03715: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03716:     use std::io::Cursor;\n03717:     use tfhe::prelude::*;\n03718:     use tfhe::{FheBool, FheUint16, ServerKey};\n03719: \n03720:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;",
+        "end": 3720,
+        "match_line": 3714,
+        "start": 3708
+      },
+      {
+        "content": "03793:         &mut selected_buf,\n03794:         POS_SAFE_SER_SIZE_LIMIT,\n03795:     )\n03796:     .map_err(|err| anyhow::anyhow!(\"failed to serialize selected FheUint16: {err}\"))?;\n03797: \n03798:     let mut params = true_value.params.clone();\n03799:     params.to_encrypt = format!(\"{expected_result:04x}\");\n03800:     params.data_type = FheType::Euint16;\n03801:     params.no_compression = true;\n03802:     params.no_precompute_sns = true;\n03803:     params.ciphertext_output_path = None;\n03804:     params.batch_size = 1;\n03805:     params.num_requests = 1;",
+        "end": 3805,
+        "match_line": 3799,
+        "start": 3793
+      },
+      {
+        "content": "03830:     prf_path: P,\n03831:     server_key_path: P,\n03832:     output_path: P,\n03833:     expected_key_id: &str,\n03834:     numerator: u64,\n03835:     denominator: u64,\n03836:     expected_result: u32,\n03837: ) -> anyhow::Result<ExternalCipherWithParamsView> {\n03838:     use std::io::Cursor;\n03839:     use tfhe::prelude::*;\n03840:     use tfhe::{FheUint32, FheUint64, ServerKey};\n03841: \n03842:     const POS_SAFE_SER_SIZE_LIMIT: u64 = 1_000_000_000;",
+        "end": 3842,
+        "match_line": 3836,
+        "start": 3830
+      },
+      {
+        "content": "03898:         &mut scaled_buf,\n03899:         POS_SAFE_SER_SIZE_LIMIT,\n03900:     )\n03901:     .map_err(|err| anyhow::anyhow!(\"failed to serialize scaled PRF FheUint32: {err}\"))?;\n03902: \n03903:     let mut params = prf.params.clone();\n03904:     params.to_encrypt = format!(\"{expected_result:08x}\");\n03905:     params.data_type = FheType::Euint32;\n03906:     params.no_compression = true;\n03907:     params.no_precompute_sns = true;\n03908:     params.ciphertext_output_path = None;\n03909:     params.batch_size = 1;\n03910:     params.num_requests = 1;",
+        "end": 3910,
+        "match_line": 3904,
+        "start": 3898
+      }
+    ],
+    "expected_matches": [
+      {
+        "line": 2603,
+        "text": "    expected_result: bool,"
+      },
+      {
+        "line": 2690,
+        "text": "    params.to_encrypt = if expected_result {"
+      },
+      {
+        "line": 2823,
+        "text": "    expected_result: u8,"
+      },
+      {
+        "line": 2913,
+        "text": "    params.to_encrypt = format!(\"{expected_result:02x}\");"
+      },
+      {
+        "line": 2955,
+        "text": "    expected_index: usize,"
+      },
+      {
+        "line": 2967,
+        "text": "    if expected_index >= value_paths.len() {"
+      },
+      {
+        "line": 2969,
+        "text": "            \"expected_index {} out of range for {} values\","
+      },
+      {
+        "line": 2970,
+        "text": "            expected_index,"
+      },
+      {
+        "line": 3065,
+        "text": "        params.to_encrypt = if idx == expected_index {"
+      },
+      {
+        "line": 3118,
+        "text": "// expected_result is test metadata only for kms-core-client decrypt-from-file"
+      },
+      {
+        "line": 3127,
+        "text": "    expected_result: u8,"
+      },
+      {
+        "line": 3199,
+        "text": "    params.to_encrypt = format!(\"{expected_result:02x}\");"
+      },
+      {
+        "line": 3236,
+        "text": "    expected_index: usize,"
+      },
+      {
+        "line": 3248,
+        "text": "    if expected_index >= flag_paths.len() {"
+      },
+      {
+        "line": 3250,
+        "text": "            \"expected_index {} out of range for {} flags\","
+      },
+      {
+        "line": 3251,
+        "text": "            expected_index,"
+      },
+      {
+        "line": 3340,
+        "text": "        params.to_encrypt = if idx == expected_index {"
+      },
+      {
+        "line": 3382,
+        "text": "// constants. expected_result is test metadata only for kms-core-client"
+      },
+      {
+        "line": 3392,
+        "text": "    expected_result: u8,"
+      },
+      {
+        "line": 3462,
+        "text": "    params.to_encrypt = format!(\"{expected_result:02x}\");"
+      },
+      {
+        "line": 3498,
+        "text": "    expected_result: bool,"
+      },
+      {
+        "line": 3568,
+        "text": "    params.to_encrypt = if expected_result {"
+      },
+      {
+        "line": 3608,
+        "text": "    expected_result: u32,"
+      },
+      {
+        "line": 3678,
+        "text": "    params.to_encrypt = format!(\"{expected_result:08x}\");"
+      },
+      {
+        "line": 3714,
+        "text": "    expected_result: u16,"
+      },
+      {
+        "line": 3799,
+        "text": "    params.to_encrypt = format!(\"{expected_result:04x}\");"
+      },
+      {
+        "line": 3836,
+        "text": "    expected_result: u32,"
+      },
+      {
+        "line": 3904,
+        "text": "    params.to_encrypt = format!(\"{expected_result:08x}\");"
+      }
+    ]
+  }
+}

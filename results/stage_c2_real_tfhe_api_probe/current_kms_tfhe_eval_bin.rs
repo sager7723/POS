@@ -1,0 +1,780 @@
+use anyhow::{bail, Context, Result};
+use clap::{Parser, Subcommand};
+use kms_core_client::{
+    eval_add_euint8_external, eval_add_euint32_external, eval_compare_euint8_external,
+    eval_compare_euint32_external, eval_locate_first_true_ebool_external,
+    eval_locate_min_euint8_external, eval_select_euint8_external,
+    eval_select_euint16_external, eval_scale_prf_euint8_external,
+    eval_scale_prf_euint32_external, inspect_server_key_external,
+    read_cipher_with_params_external_view,
+};
+use serde::Serialize;
+use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+#[command(name = "kms-tfhe-eval")]
+#[command(about = "PoS native KMS/TFHE evaluator validation tool")]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand, Debug)]
+enum Command {
+    Decode {
+        #[arg(long)]
+        left: PathBuf,
+        #[arg(long)]
+        right: PathBuf,
+        #[arg(long)]
+        server_key: PathBuf,
+        #[arg(long)]
+        expected_key_id: String,
+        #[arg(long, default_value = "euint8")]
+        expected_data_type: String,
+        #[arg(long, default_value = "SmallExpanded")]
+        expected_ct_format: String,
+    },
+
+    EvalAdd {
+        #[arg(long)]
+        left: PathBuf,
+        #[arg(long)]
+        right: PathBuf,
+        #[arg(long)]
+        server_key: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long)]
+        expected_key_id: String,
+        #[arg(long)]
+        expected_result: u64,
+    },
+
+    EvalScalePrf {
+        #[arg(long)]
+        prf: PathBuf,
+        #[arg(long)]
+        server_key: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long)]
+        expected_key_id: String,
+        #[arg(long)]
+        numerator: u64,
+        #[arg(long)]
+        denominator: u64,
+        #[arg(long)]
+        expected_result: u64,
+    },
+
+    EvalCompare {
+        #[arg(long)]
+        left: PathBuf,
+        #[arg(long)]
+        right: PathBuf,
+        #[arg(long)]
+        server_key: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long)]
+        expected_key_id: String,
+        #[arg(long)]
+        expected_result: String,
+    },
+
+    EvalSelect {
+        #[arg(long)]
+        selector: PathBuf,
+        #[arg(long)]
+        true_value: PathBuf,
+        #[arg(long)]
+        false_value: PathBuf,
+        #[arg(long)]
+        server_key: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long)]
+        expected_key_id: String,
+        #[arg(long)]
+        expected_result: u64,
+    },
+
+    EvalLocate {
+        #[arg(long = "value", required = true)]
+        values: Vec<PathBuf>,
+        #[arg(long)]
+        server_key: PathBuf,
+        #[arg(long)]
+        output_dir: PathBuf,
+        #[arg(long)]
+        expected_key_id: String,
+        #[arg(long)]
+        expected_index: usize,
+    },
+
+    EvalLocateBool {
+        #[arg(long = "flag", required = true)]
+        flags: Vec<PathBuf>,
+        #[arg(long)]
+        server_key: PathBuf,
+        #[arg(long)]
+        output_dir: PathBuf,
+        #[arg(long)]
+        expected_key_id: String,
+        #[arg(long)]
+        expected_index: usize,
+    },
+
+    InspectServerKey {
+        #[arg(long)]
+        server_key: PathBuf,
+    },
+}
+
+#[derive(Debug, Serialize)]
+struct CipherReport {
+    path: String,
+    to_encrypt_hex: String,
+    data_type: String,
+    no_compression: bool,
+    no_precompute_sns: bool,
+    key_id: String,
+    ct_format: String,
+    cipher_len: usize,
+    cipher_prefix_hex: String,
+}
+
+#[derive(Debug, Serialize)]
+struct DecodeReport {
+    ok: bool,
+    expected_key_id: String,
+    expected_data_type: String,
+    expected_ct_format: String,
+    server_key_path: String,
+    server_key_len: usize,
+    server_key_prefix_hex: String,
+    left: CipherReport,
+    right: CipherReport,
+}
+
+#[derive(Debug, Serialize)]
+struct EvalSingleReport {
+    ok: bool,
+    operation: String,
+    expected_result: serde_json::Value,
+    output_path: String,
+    output: CipherReport,
+}
+
+#[derive(Debug, Serialize)]
+struct EvalVectorReport {
+    ok: bool,
+    operation: String,
+    expected_index: usize,
+    output_dir: String,
+    outputs: Vec<CipherReport>,
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Command::Decode {
+            left,
+            right,
+            server_key,
+            expected_key_id,
+            expected_data_type,
+            expected_ct_format,
+        } => {
+            let report = decode_command(
+                left,
+                right,
+                server_key,
+                expected_key_id,
+                expected_data_type,
+                expected_ct_format,
+            )
+            .await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+
+        Command::EvalAdd {
+            left,
+            right,
+            server_key,
+            output,
+            expected_key_id,
+            expected_result,
+        } => {
+            let report = eval_add_command(
+                left,
+                right,
+                server_key,
+                output,
+                expected_key_id,
+                expected_result,
+            )
+            .await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+
+        Command::EvalScalePrf {
+            prf,
+            server_key,
+            output,
+            expected_key_id,
+            numerator,
+            denominator,
+            expected_result,
+        } => {
+            let report = eval_scale_prf_command(
+                prf,
+                server_key,
+                output,
+                expected_key_id,
+                numerator,
+                denominator,
+                expected_result,
+            )
+            .await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+
+        Command::EvalCompare {
+            left,
+            right,
+            server_key,
+            output,
+            expected_key_id,
+            expected_result,
+        } => {
+            let expected_result = parse_expected_result(&expected_result)?;
+            let report = eval_compare_command(
+                left,
+                right,
+                server_key,
+                output,
+                expected_key_id,
+                expected_result,
+            )
+            .await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+
+        Command::EvalSelect {
+            selector,
+            true_value,
+            false_value,
+            server_key,
+            output,
+            expected_key_id,
+            expected_result,
+        } => {
+            let report = eval_select_command(
+                selector,
+                true_value,
+                false_value,
+                server_key,
+                output,
+                expected_key_id,
+                expected_result,
+            )
+            .await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+
+        Command::EvalLocate {
+            values,
+            server_key,
+            output_dir,
+            expected_key_id,
+            expected_index,
+        } => {
+            let report = eval_locate_command(
+                values,
+                server_key,
+                output_dir,
+                expected_key_id,
+                expected_index,
+            )
+            .await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+
+        Command::EvalLocateBool {
+            flags,
+            server_key,
+            output_dir,
+            expected_key_id,
+            expected_index,
+        } => {
+            let report = eval_locate_bool_command(
+                flags,
+                server_key,
+                output_dir,
+                expected_key_id,
+                expected_index,
+            )
+            .await?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+
+        Command::InspectServerKey { server_key } => {
+            let report = inspect_server_key_external(server_key).await;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+    }
+
+    Ok(())
+}
+
+async fn decode_command(
+    left_path: PathBuf,
+    right_path: PathBuf,
+    server_key_path: PathBuf,
+    expected_key_id: String,
+    expected_data_type: String,
+    expected_ct_format: String,
+) -> Result<DecodeReport> {
+    let left = read_cipher_with_params_external_view(&left_path)
+        .await
+        .with_context(|| format!("failed to read left ciphertext {}", left_path.display()))?;
+
+    let right = read_cipher_with_params_external_view(&right_path)
+        .await
+        .with_context(|| format!("failed to read right ciphertext {}", right_path.display()))?;
+
+    validate_cipher("left", &left, &expected_key_id, &expected_data_type, &expected_ct_format)?;
+    validate_cipher("right", &right, &expected_key_id, &expected_data_type, &expected_ct_format)?;
+
+    let server_key_bytes = tokio::fs::read(&server_key_path)
+        .await
+        .with_context(|| format!("failed to read server key {}", server_key_path.display()))?;
+
+    if server_key_bytes.is_empty() {
+        bail!("server key file is empty: {}", server_key_path.display());
+    }
+
+    let prefix_len = std::cmp::min(server_key_bytes.len(), 32);
+
+    Ok(DecodeReport {
+        ok: true,
+        expected_key_id,
+        expected_data_type,
+        expected_ct_format,
+        server_key_path: server_key_path.display().to_string(),
+        server_key_len: server_key_bytes.len(),
+        server_key_prefix_hex: hex::encode(&server_key_bytes[..prefix_len]),
+        left: to_report(left_path, left),
+        right: to_report(right_path, right),
+    })
+}
+
+fn parse_expected_result(value: &str) -> Result<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(true),
+        "0" | "false" | "no" | "off" => Ok(false),
+        other => bail!("invalid --expected-result value {other:?}; use true/false or 1/0"),
+    }
+}
+
+
+async fn eval_add_command(
+    left_path: PathBuf,
+    right_path: PathBuf,
+    server_key_path: PathBuf,
+    output_path: PathBuf,
+    expected_key_id: String,
+    expected_result: u64,
+) -> Result<EvalSingleReport> {
+    let left_view = read_cipher_with_params_external_view(&left_path)
+        .await
+        .with_context(|| format!("failed to inspect left ciphertext {}", left_path.display()))?;
+
+    match left_view.data_type.as_str() {
+        "euint8" => {
+            let expected_u8: u8 = expected_result
+                .try_into()
+                .with_context(|| "expected_result does not fit euint8")?;
+
+            let output = eval_add_euint8_external(
+                &left_path,
+                &right_path,
+                &server_key_path,
+                &output_path,
+                &expected_key_id,
+                expected_u8,
+            )
+            .await
+            .with_context(|| "real TFHE eval_add euint8 failed")?;
+
+            validate_cipher("output", &output, &expected_key_id, "euint8", "SmallExpanded")?;
+
+            Ok(EvalSingleReport {
+                ok: true,
+                operation: "euint8_add".to_owned(),
+                expected_result: serde_json::json!(expected_result),
+                output_path: output_path.display().to_string(),
+                output: to_report(output_path, output),
+            })
+        }
+
+        "euint32" => {
+            let expected_u32: u32 = expected_result
+                .try_into()
+                .with_context(|| "expected_result does not fit euint32")?;
+
+            let output = eval_add_euint32_external(
+                &left_path,
+                &right_path,
+                &server_key_path,
+                &output_path,
+                &expected_key_id,
+                expected_u32,
+            )
+            .await
+            .with_context(|| "real TFHE eval_add euint32 failed")?;
+
+            validate_cipher("output", &output, &expected_key_id, "euint32", "SmallExpanded")?;
+
+            Ok(EvalSingleReport {
+                ok: true,
+                operation: "euint32_add".to_owned(),
+                expected_result: serde_json::json!(expected_result),
+                output_path: output_path.display().to_string(),
+                output: to_report(output_path, output),
+            })
+        }
+
+        other => bail!("eval-add unsupported input data_type {other:?}; expected euint8 or euint32"),
+    }
+}
+
+
+async fn eval_scale_prf_command(
+    prf_path: PathBuf,
+    server_key_path: PathBuf,
+    output_path: PathBuf,
+    expected_key_id: String,
+    numerator: u64,
+    denominator: u64,
+    expected_result: u64,
+) -> Result<EvalSingleReport> {
+    let prf_view = read_cipher_with_params_external_view(&prf_path)
+        .await
+        .with_context(|| format!("failed to inspect prf ciphertext {}", prf_path.display()))?;
+
+    match prf_view.data_type.as_str() {
+        "euint8" => {
+            let numerator_u16: u16 = numerator
+                .try_into()
+                .with_context(|| "numerator does not fit u16 for euint8 scale")?;
+            let denominator_u16: u16 = denominator
+                .try_into()
+                .with_context(|| "denominator does not fit u16 for euint8 scale")?;
+            let expected_u8: u8 = expected_result
+                .try_into()
+                .with_context(|| "expected_result does not fit euint8")?;
+
+            let output = eval_scale_prf_euint8_external(
+                &prf_path,
+                &server_key_path,
+                &output_path,
+                &expected_key_id,
+                numerator_u16,
+                denominator_u16,
+                expected_u8,
+            )
+            .await
+            .with_context(|| "real TFHE eval_scale_prf euint8 failed")?;
+
+            validate_cipher("output", &output, &expected_key_id, "euint8", "SmallExpanded")?;
+
+            Ok(EvalSingleReport {
+                ok: true,
+                operation: "euint8_scale_prf".to_owned(),
+                expected_result: serde_json::json!(expected_result),
+                output_path: output_path.display().to_string(),
+                output: to_report(output_path, output),
+            })
+        }
+
+        "euint32" => {
+            let expected_u32: u32 = expected_result
+                .try_into()
+                .with_context(|| "expected_result does not fit euint32")?;
+
+            let output = eval_scale_prf_euint32_external(
+                &prf_path,
+                &server_key_path,
+                &output_path,
+                &expected_key_id,
+                numerator,
+                denominator,
+                expected_u32,
+            )
+            .await
+            .with_context(|| "real TFHE eval_scale_prf euint32 failed")?;
+
+            validate_cipher("output", &output, &expected_key_id, "euint32", "SmallExpanded")?;
+
+            Ok(EvalSingleReport {
+                ok: true,
+                operation: "euint32_scale_prf".to_owned(),
+                expected_result: serde_json::json!(expected_result),
+                output_path: output_path.display().to_string(),
+                output: to_report(output_path, output),
+            })
+        }
+
+        other => bail!("eval-scale-prf unsupported input data_type {other:?}; expected euint8 or euint32"),
+    }
+}
+
+
+async fn eval_compare_command(
+    left_path: PathBuf,
+    right_path: PathBuf,
+    server_key_path: PathBuf,
+    output_path: PathBuf,
+    expected_key_id: String,
+    expected_result: bool,
+) -> Result<EvalSingleReport> {
+    let left_view = read_cipher_with_params_external_view(&left_path)
+        .await
+        .with_context(|| format!("failed to inspect left ciphertext {}", left_path.display()))?;
+
+    match left_view.data_type.as_str() {
+        "euint8" => {
+            let output = eval_compare_euint8_external(
+                &left_path,
+                &right_path,
+                &server_key_path,
+                &output_path,
+                &expected_key_id,
+                expected_result,
+            )
+            .await
+            .with_context(|| "real TFHE eval_compare euint8 failed")?;
+
+            validate_cipher("output", &output, &expected_key_id, "ebool", "SmallExpanded")?;
+
+            Ok(EvalSingleReport {
+                ok: true,
+                operation: "euint8_lt".to_owned(),
+                expected_result: serde_json::json!(expected_result),
+                output_path: output_path.display().to_string(),
+                output: to_report(output_path, output),
+            })
+        }
+
+        "euint32" => {
+            let output = eval_compare_euint32_external(
+                &left_path,
+                &right_path,
+                &server_key_path,
+                &output_path,
+                &expected_key_id,
+                expected_result,
+            )
+            .await
+            .with_context(|| "real TFHE eval_compare euint32 failed")?;
+
+            validate_cipher("output", &output, &expected_key_id, "ebool", "SmallExpanded")?;
+
+            Ok(EvalSingleReport {
+                ok: true,
+                operation: "euint32_lt".to_owned(),
+                expected_result: serde_json::json!(expected_result),
+                output_path: output_path.display().to_string(),
+                output: to_report(output_path, output),
+            })
+        }
+
+        other => bail!("eval-compare unsupported input data_type {other:?}; expected euint8 or euint32"),
+    }
+}
+
+
+async fn eval_select_command(
+    selector_path: PathBuf,
+    true_value_path: PathBuf,
+    false_value_path: PathBuf,
+    server_key_path: PathBuf,
+    output_path: PathBuf,
+    expected_key_id: String,
+    expected_result: u64,
+) -> Result<EvalSingleReport> {
+    let true_view = read_cipher_with_params_external_view(&true_value_path)
+        .await
+        .with_context(|| format!("failed to inspect true_value ciphertext {}", true_value_path.display()))?;
+
+    match true_view.data_type.as_str() {
+        "euint8" => {
+            let expected_u8: u8 = expected_result
+                .try_into()
+                .with_context(|| "expected_result does not fit euint8")?;
+
+            let output = eval_select_euint8_external(
+                &selector_path,
+                &true_value_path,
+                &false_value_path,
+                &server_key_path,
+                &output_path,
+                &expected_key_id,
+                expected_u8,
+            )
+            .await
+            .with_context(|| "real TFHE eval_select euint8 failed")?;
+
+            validate_cipher("output", &output, &expected_key_id, "euint8", "SmallExpanded")?;
+
+            Ok(EvalSingleReport {
+                ok: true,
+                operation: "ebool_cmux_euint8".to_owned(),
+                expected_result: serde_json::json!(expected_result),
+                output_path: output_path.display().to_string(),
+                output: to_report(output_path, output),
+            })
+        }
+
+        "euint16" => {
+            let expected_u16: u16 = expected_result
+                .try_into()
+                .with_context(|| "expected_result does not fit euint16")?;
+
+            let output = eval_select_euint16_external(
+                &selector_path,
+                &true_value_path,
+                &false_value_path,
+                &server_key_path,
+                &output_path,
+                &expected_key_id,
+                expected_u16,
+            )
+            .await
+            .with_context(|| "real TFHE eval_select euint16 failed")?;
+
+            validate_cipher("output", &output, &expected_key_id, "euint16", "SmallExpanded")?;
+
+            Ok(EvalSingleReport {
+                ok: true,
+                operation: "ebool_cmux_euint16".to_owned(),
+                expected_result: serde_json::json!(expected_result),
+                output_path: output_path.display().to_string(),
+                output: to_report(output_path, output),
+            })
+        }
+
+        other => bail!("eval-select unsupported true_value data_type {other:?}; expected euint8 or euint16"),
+    }
+}
+
+async fn eval_locate_command(
+    values: Vec<PathBuf>,
+    server_key_path: PathBuf,
+    output_dir: PathBuf,
+    expected_key_id: String,
+    expected_index: usize,
+) -> Result<EvalVectorReport> {
+    let outputs = eval_locate_min_euint8_external(
+        &values,
+        &server_key_path,
+        &output_dir,
+        &expected_key_id,
+        expected_index,
+    )
+    .await
+    .with_context(|| "real TFHE eval_locate failed")?;
+
+    let mut reports = Vec::with_capacity(outputs.len());
+
+    for (idx, output) in outputs.into_iter().enumerate() {
+        validate_cipher(
+            &format!("output[{idx}]"),
+            &output,
+            &expected_key_id,
+            "ebool",
+            "SmallExpanded",
+        )?;
+
+        reports.push(to_report(
+            output_dir.join(format!("onehot_{idx:02}.ebool.ct")),
+            output,
+        ));
+    }
+
+    Ok(EvalVectorReport {
+        ok: true,
+        operation: "euint8_argmin_onehot".to_owned(),
+        expected_index,
+        output_dir: output_dir.display().to_string(),
+        outputs: reports,
+    })
+}
+
+async fn eval_locate_bool_command(
+    flags: Vec<PathBuf>,
+    server_key_path: PathBuf,
+    output_dir: PathBuf,
+    expected_key_id: String,
+    expected_index: usize,
+) -> Result<EvalVectorReport> {
+    let outputs = eval_locate_first_true_ebool_external(
+        &flags,
+        &server_key_path,
+        &output_dir,
+        &expected_key_id,
+        expected_index,
+    )
+    .await
+    .with_context(|| "real TFHE eval_locate_bool failed")?;
+
+    let mut reports = Vec::with_capacity(outputs.len());
+
+    for (idx, output) in outputs.into_iter().enumerate() {
+        validate_cipher(
+            &format!("output[{idx}]"),
+            &output,
+            &expected_key_id,
+            "ebool",
+            "SmallExpanded",
+        )?;
+
+        reports.push(to_report(
+            output_dir.join(format!("first_true_{idx:02}.ebool.ct")),
+            output,
+        ));
+    }
+
+    Ok(EvalVectorReport {
+        ok: true,
+        operation: "ebool_first_true_onehot".to_owned(),
+        expected_index,
+        output_dir: output_dir.display().to_string(),
+        outputs: reports,
+    })
+}
+
+fn validate_cipher(
+    label: &str,
+    cipher: &kms_core_client::ExternalCipherWithParamsView,
+    expected_key_id: &str,
+    expected_data_type: &str,
+    expected_ct_format: &str,
+) -> Result<()> {
+    if cipher.key_id != expected_key_id {
+        bail!("{label} key_id mismatch: got {}, expected {}", cipher.key_id, expected_key_id);
+    }
+
+    if cipher.data_type != expected_data_type {
+        bail!("{label} data_type mismatch: got {}, expected {}", cipher.data_type, expected_data_type);
+    }
+
+    if cipher.ct_format != expected_ct_format {
+        bail!("{label} ct_format mismatch: got {}, expected {}", cipher.ct_format, expected_ct_format);
+    }
+

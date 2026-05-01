@@ -1,0 +1,27 @@
+=== Real KMS POS Full Correctness Test: Step0-Step23 ===
+Step0_public_parameter_setup: ok (0.097458s)
+Step1_pedersen_commit: ok (0.076289s)
+Step2_kms_threshold_dkg: ok (1.184723s)
+Step3_seed_generation: ok (0.327722s)
+Step4_kh_prf_share: ok (0.360469s)
+Step5_encrypt_prf_and_opaque_proof: ok (1.537841s)
+Step6_encrypt_stake_and_opaque_proof: ok (1.767785s)
+Step7_ticket_hash_encrypt_suffix_and_opaque_proof: ok (12.540004s)
+Step8_candidate_message_build: ok (0.000029s)
+Step9_verification_seed: ok (0.000028s)
+Step10_cut_and_choose_open_plan: ok (0.000064s)
+Step11_opaque_proof_verify: ok (2.297235s)
+Step12_homomorphic_sum_stakes: ok (1.021270s)
+Step13_14_total_stake_threshold_recover: ok (0.908010s)
+Step15_scaling_ratio: ok (0.000002s)
+Step16_homomorphic_sum_prf: ok (1.232355s)
+Step17_homomorphic_scale_prf: ok (0.575291s)
+Step18_compare_locate_select: ok (10.965072s)
+Step19_ticket_threshold_partial_decrypt: ok (3.820527s)
+Step20_ticket_suffix_recover: ok (4.595277s)
+Step21_local_suffix_match_observe_winner: ok (0.000041s)
+Step22_winner_publish_ticket_preimage: ok (0.000110s)
+Step23_public_winner_verification: ok (0.000151s)
+summary: results/stage_h2_real_kms_step0_23/summary.json
+step_csv: results/stage_h2_real_kms_step0_23/step_seconds.csv
+Real KMS POS full correctness test Step0-Step23 passed.

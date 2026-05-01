@@ -1,0 +1,31 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/manual_check_stage_h2_real_kms_full_flow.py", line 270, in <module>
+    main()
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/manual_check_stage_h2_real_kms_full_flow.py", line 189, in main
+    phase2_result = run_phase2_preparation(
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/protocol/preparation.py", line 139, in run_phase2_preparation
+    distributed_key_result = step2_distributed_generate_keys(
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/protocol/preparation.py", line 59, in step2_distributed_generate_keys
+    result = dkg.distributed_keygen(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/dkg.py", line 171, in distributed_keygen
+    generated_key_material = build_threshold_key_material(
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/thfhe_backend/factory.py", line 118, in build_threshold_key_material
+    return _build_kms_threshold_key_material(participant_ids, threshold)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/thfhe_backend/factory.py", line 73, in _build_kms_threshold_key_material
+    backend = KmsThresholdFHEBackend.from_env(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/thfhe_backend/kms_fhe_backend.py", line 154, in from_env
+    bridge=KmsThresholdBridge(KmsBridgeConfig.from_env()),
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/biancheng/pycharm/scientific_project/PoS/pos/crypto/thfhe_backend/kms_bridge.py", line 54, in from_env
+    raise KmsBridgeError(
+pos.crypto.thfhe_backend.kms_bridge.KmsBridgeError: Missing required KMS bridge environment variables: POS_KMS_CORE_CLIENT_BIN, POS_KMS_CORE_CLIENT_CONFIG, POS_KMS_KEY_ID
+=== Stage H-2 Real KMS Full POS Flow Correctness Check ===
+Step0 ok

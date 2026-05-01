@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pos.crypto.thfhe_backend.kms_eval_oracle_guard import assert_no_expected_oracle_evaluator
+
 import json
 import os
 import re
@@ -164,19 +166,12 @@ class KmsTfheEvalBridge:
         self,
         left: KmsThresholdCiphertextHandle,
         right: KmsThresholdCiphertextHandle,
-        *,
-        expected_result: int,
     ) -> KmsThresholdCiphertextHandle:
+        assert_no_expected_oracle_evaluator()
         self._ensure_ciphertext(left)
         self._ensure_ciphertext(right)
 
         data_type = _ensure_same_euint(left, right)
-        modulus = _euint_modulus(data_type)
-
-        if expected_result < 0 or expected_result >= modulus:
-            raise KmsEvalBridgeError(
-                f"expected_result must fit {data_type}, got {expected_result}"
-            )
 
         output_id = uuid.uuid4().hex
         output_path = self.config.ciphertext_dir / f"{output_id}.{data_type}.ct"
@@ -194,8 +189,6 @@ class KmsTfheEvalBridge:
                 str(output_path),
                 "--expected-key-id",
                 self.config.key_id,
-                "--expected-result",
-                str(expected_result),
             ]
         )
 
@@ -214,28 +207,22 @@ class KmsTfheEvalBridge:
             ciphertext_id=output_id,
         )
 
-
     def eval_scale_prf(
         self,
         prf: KmsThresholdCiphertextHandle,
         *,
         numerator: int,
         denominator: int,
-        expected_result: int,
     ) -> KmsThresholdCiphertextHandle:
+        assert_no_expected_oracle_evaluator()
         self._ensure_ciphertext(prf)
 
         _euint_bits(prf.data_type)
-        modulus = _euint_modulus(prf.data_type)
 
         if numerator < 0:
             raise KmsEvalBridgeError(f"numerator must be non-negative, got {numerator}")
         if denominator <= 0:
             raise KmsEvalBridgeError(f"denominator must be positive, got {denominator}")
-        if expected_result < 0 or expected_result >= modulus:
-            raise KmsEvalBridgeError(
-                f"expected_result must fit {prf.data_type}, got {expected_result}"
-            )
 
         output_id = uuid.uuid4().hex
         output_path = self.config.ciphertext_dir / f"{output_id}.{prf.data_type}.ct"
@@ -255,8 +242,6 @@ class KmsTfheEvalBridge:
                 str(numerator),
                 "--denominator",
                 str(denominator),
-                "--expected-result",
-                str(expected_result),
             ]
         )
 
@@ -275,16 +260,16 @@ class KmsTfheEvalBridge:
             ciphertext_id=output_id,
         )
 
-
     def eval_compare(
         self,
         left: KmsThresholdCiphertextHandle,
         right: KmsThresholdCiphertextHandle,
-        *,
-        expected_result: bool,
     ) -> KmsThresholdCiphertextHandle:
+        assert_no_expected_oracle_evaluator()
         self._ensure_ciphertext(left)
         self._ensure_ciphertext(right)
+
+        _ensure_same_euint(left, right)
 
         output_id = uuid.uuid4().hex
         output_path = self.config.ciphertext_dir / f"{output_id}.ebool.ct"
@@ -302,8 +287,6 @@ class KmsTfheEvalBridge:
                 str(output_path),
                 "--expected-key-id",
                 self.config.key_id,
-                "--expected-result",
-                "true" if expected_result else "false",
             ]
         )
 
@@ -327,9 +310,8 @@ class KmsTfheEvalBridge:
         selector: KmsThresholdCiphertextHandle,
         true_value: KmsThresholdCiphertextHandle,
         false_value: KmsThresholdCiphertextHandle,
-        *,
-        expected_result: int,
     ) -> KmsThresholdCiphertextHandle:
+        assert_no_expected_oracle_evaluator()
         self._ensure_ciphertext(selector)
         self._ensure_ciphertext(true_value)
         self._ensure_ciphertext(false_value)
@@ -343,12 +325,6 @@ class KmsTfheEvalBridge:
             left_label="true_value",
             right_label="false_value",
         )
-        modulus = _euint_modulus(data_type)
-
-        if expected_result < 0 or expected_result >= modulus:
-            raise KmsEvalBridgeError(
-                f"expected_result must fit {data_type}, got {expected_result}"
-            )
 
         output_id = uuid.uuid4().hex
         output_path = self.config.ciphertext_dir / f"{output_id}.{data_type}.ct"
@@ -368,8 +344,6 @@ class KmsTfheEvalBridge:
                 str(output_path),
                 "--expected-key-id",
                 self.config.key_id,
-                "--expected-result",
-                str(expected_result),
             ]
         )
 
@@ -388,145 +362,117 @@ class KmsTfheEvalBridge:
             ciphertext_id=output_id,
         )
 
-
     def eval_locate(
         self,
         values: list[KmsThresholdCiphertextHandle],
-        *,
-        expected_index: int,
     ) -> list[KmsThresholdCiphertextHandle]:
+        assert_no_expected_oracle_evaluator()
         if not values:
-            raise KmsEvalBridgeError("eval_locate requires at least one ciphertext")
+            raise KmsEvalBridgeError("eval-locate requires at least one ciphertext")
 
-        if expected_index < 0 or expected_index >= len(values):
-            raise KmsEvalBridgeError(
-                f"expected_index {expected_index} out of range for {len(values)} values"
-            )
-
-        for idx, value in enumerate(values):
+        for value in values:
             self._ensure_ciphertext(value)
-            _euint_bits(value.data_type)
+            if value.data_type != "euint8":
+                raise KmsEvalBridgeError(
+                    f"eval-locate currently requires euint8 values, got {value.data_type!r}"
+                )
 
         output_id = uuid.uuid4().hex
         output_dir = self.config.ciphertext_dir / f"{output_id}.locate"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        command_args: list[str] = ["eval-locate"]
+        args = [
+            "eval-locate",
+            "--server-key",
+            str(self.config.server_key_path),
+            "--output-dir",
+            str(output_dir),
+            "--expected-key-id",
+            self.config.key_id,
+        ]
 
         for value in values:
-            command_args.extend(["--value", value.ciphertext_path])
+            args.extend(["--values", value.ciphertext_path])
 
-        command_args.extend(
-            [
-                "--server-key",
-                str(self.config.server_key_path),
-                "--output-dir",
-                str(output_dir),
-                "--expected-key-id",
-                self.config.key_id,
-                "--expected-index",
-                str(expected_index),
-            ]
-        )
+        stdout = self._run(args)
 
-        stdout = self._run(command_args)
         report = json.loads(stdout)
-
         if report.get("ok") is not True:
             raise KmsEvalBridgeError(f"eval-locate did not return ok=true: {report}")
 
-        outputs = report.get("outputs")
-        if not isinstance(outputs, list) or len(outputs) != len(values):
-            raise KmsEvalBridgeError(f"eval-locate returned invalid outputs: {report}")
-
         handles: list[KmsThresholdCiphertextHandle] = []
-        for idx, output in enumerate(outputs):
-            output_path = Path(output["path"])
-            if not output_path.is_file():
-                raise KmsEvalBridgeError(f"eval-locate output file does not exist: {output_path}")
+        for idx in range(len(values)):
+            path = output_dir / f"onehot_{idx:02}.ebool.ct"
+            if not path.is_file():
+                raise KmsEvalBridgeError(f"eval-locate missing output file: {path}")
 
             handles.append(
                 KmsThresholdCiphertextHandle(
                     backend="kms-threshold",
                     key_id=self.config.key_id,
                     data_type="ebool",
-                    ciphertext_path=str(output_path),
+                    ciphertext_path=str(path),
                     ciphertext_id=f"{output_id}_onehot_{idx:02}",
                 )
             )
 
         return handles
 
-
     def eval_locate_first_true(
         self,
         flags: list[KmsThresholdCiphertextHandle],
-        *,
-        expected_index: int,
     ) -> list[KmsThresholdCiphertextHandle]:
+        assert_no_expected_oracle_evaluator()
         if not flags:
-            raise KmsEvalBridgeError("eval_locate_first_true requires at least one flag")
-
-        if expected_index < 0 or expected_index >= len(flags):
-            raise KmsEvalBridgeError(
-                f"expected_index {expected_index} out of range for {len(flags)} flags"
-            )
-
-        for idx, flag in enumerate(flags):
-            self._ensure_ciphertext(flag)
-            if flag.data_type != "ebool":
-                raise KmsEvalBridgeError(f"flag[{idx}] must be ebool, got {flag.data_type!r}")
-
-        output_id = uuid.uuid4().hex
-        output_dir = self.config.ciphertext_dir / f"{output_id}.first_true"
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        command_args: list[str] = ["eval-locate-bool"]
+            raise KmsEvalBridgeError("eval-locate-bool requires at least one ciphertext")
 
         for flag in flags:
-            command_args.extend(["--flag", flag.ciphertext_path])
+            self._ensure_ciphertext(flag)
+            if flag.data_type != "ebool":
+                raise KmsEvalBridgeError(
+                    f"eval-locate-bool requires ebool flags, got {flag.data_type!r}"
+                )
 
-        command_args.extend(
-            [
-                "--server-key",
-                str(self.config.server_key_path),
-                "--output-dir",
-                str(output_dir),
-                "--expected-key-id",
-                self.config.key_id,
-                "--expected-index",
-                str(expected_index),
-            ]
-        )
+        output_id = uuid.uuid4().hex
+        output_dir = self.config.ciphertext_dir / f"{output_id}.locate_bool"
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        stdout = self._run(command_args)
+        args = [
+            "eval-locate-bool",
+            "--server-key",
+            str(self.config.server_key_path),
+            "--output-dir",
+            str(output_dir),
+            "--expected-key-id",
+            self.config.key_id,
+        ]
+
+        for flag in flags:
+            args.extend(["--flag", flag.ciphertext_path])
+
+        stdout = self._run(args)
+
         report = json.loads(stdout)
-
         if report.get("ok") is not True:
             raise KmsEvalBridgeError(f"eval-locate-bool did not return ok=true: {report}")
 
-        outputs = report.get("outputs")
-        if not isinstance(outputs, list) or len(outputs) != len(flags):
-            raise KmsEvalBridgeError(f"eval-locate-bool returned invalid outputs: {report}")
-
         handles: list[KmsThresholdCiphertextHandle] = []
-        for idx, output in enumerate(outputs):
-            output_path = Path(output["path"])
-            if not output_path.is_file():
-                raise KmsEvalBridgeError(f"eval-locate-bool output file does not exist: {output_path}")
+        for idx in range(len(flags)):
+            path = output_dir / f"first_true_{idx:02}.ebool.ct"
+            if not path.is_file():
+                raise KmsEvalBridgeError(f"eval-locate-bool missing output file: {path}")
 
             handles.append(
                 KmsThresholdCiphertextHandle(
                     backend="kms-threshold",
                     key_id=self.config.key_id,
                     data_type="ebool",
-                    ciphertext_path=str(output_path),
+                    ciphertext_path=str(path),
                     ciphertext_id=f"{output_id}_first_true_{idx:02}",
                 )
             )
 
         return handles
-
 
     def _ensure_ciphertext(self, ciphertext: KmsThresholdCiphertextHandle) -> None:
         if ciphertext.backend != "kms-threshold":

@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Sequence
 
 from pos.models.common import PublicParameters
 from pos.models.stage3 import Phase3ParticipantArtifact, TicketCipherLayout
-from pos.models.stage4 import Phase4Result
+from pos.models.stage4 import DecryptionShare, Phase4Result
 from pos.spec import hash_bytes
 
 
 @dataclass(frozen=True)
 class PatentStep20TicketRecoveryResult:
     winner_participant_id: str
+    decryption_shares_by_chunk: dict[int, list[DecryptionShare]]
     decrypted_ticket_chunks: list[int]
     ticket_hash_suffix: str
     ticket_hash: str
@@ -25,10 +26,8 @@ class PatentStep20TicketRecoveryResult:
 
 def _ciphertext_from_wire(fhe: Any, value: Any) -> Any:
     """
-    Convert Phase4 wire JSON back into the FHE backend ciphertext handle.
-
-    This does not decrypt by itself. It only restores the public KMS ciphertext
-    handle so Step19 can call the configured threshold decrypt operation.
+    Restore a public KMS ciphertext handle so Step19 can request threshold
+    decryption shares. This function does not decrypt.
     """
     if not isinstance(value, str):
         return value
@@ -46,10 +45,7 @@ def _ciphertext_from_wire(fhe: Any, value: Any) -> Any:
     if payload.get("backend") != "kms-threshold":
         raise ValueError(f"unsupported ciphertext backend: {payload.get('backend')!r}")
 
-    try:
-        from pos.crypto.thfhe_backend.kms_fhe_backend import KmsThresholdCiphertextHandle
-    except ImportError:
-        from pos.crypto.thfhe_backend.kms_bridge import KmsThresholdCiphertextHandle  # type: ignore
+    from pos.crypto.thfhe_backend.kms_fhe_backend import KmsThresholdCiphertextHandle
 
     return KmsThresholdCiphertextHandle(
         backend=str(payload["backend"]),
@@ -60,42 +56,93 @@ def _ciphertext_from_wire(fhe: Any, value: Any) -> Any:
     )
 
 
-def decrypt_winning_ticket_chunks(
+def step19_generate_winning_ticket_decryption_shares(
     fhe: Any,
+    *,
+    participant_ids: Sequence[str],
     winning_ticket_ciphertext: Sequence[Any],
+    layout: TicketCipherLayout,
+) -> dict[int, list[DecryptionShare]]:
+    """
+    Patent Step19: generate threshold partial decrypt shares only for the
+    Step18-selected encrypted winning ticket suffix chunks.
+    """
+    participant_ids = list(participant_ids)
+    if not participant_ids:
+        raise ValueError("participant_ids must not be empty")
+
+    if len(winning_ticket_ciphertext) != layout.chunk_count:
+        raise ValueError(
+            "winning_ticket_ciphertext chunk count does not match public ticket layout"
+        )
+
+    shares_by_chunk: dict[int, list[DecryptionShare]] = {}
+
+    for chunk_index, wire_value in enumerate(winning_ticket_ciphertext):
+        ciphertext = _ciphertext_from_wire(fhe, wire_value)
+        shares_by_chunk[chunk_index] = [
+            DecryptionShare(
+                participant_id=participant_id,
+                share=fhe.decrypt_share(
+                    participant_id=participant_id,
+                    ciphertext=ciphertext,
+                ),
+            )
+            for participant_id in participant_ids
+        ]
+
+    return shares_by_chunk
+
+
+def step20_recover_winning_ticket_chunks(
+    fhe: Any,
+    *,
+    winning_ticket_ciphertext: Sequence[Any],
+    decryption_shares_by_chunk: dict[int, list[DecryptionShare]],
     layout: TicketCipherLayout,
 ) -> list[int]:
     """
-    Patent Step19: threshold decrypt the selected winning ticket suffix chunks.
-
-    The input must be the euint16 chunk vector selected by Step18.
+    Patent Step20: combine Step19 threshold shares to recover only the selected
+    winning ticket suffix chunks.
     """
     if layout.chunk_bit_width != 16:
         raise ValueError(
-            f"Stage-10-E expects euint16 ticket chunks, got {layout.chunk_bit_width}"
+            f"Step20 expects euint16 ticket chunks, got {layout.chunk_bit_width}"
         )
 
     if len(winning_ticket_ciphertext) != layout.chunk_count:
         raise ValueError(
-            f"winning_ticket_ciphertext chunk count mismatch: "
-            f"got {len(winning_ticket_ciphertext)}, expected {layout.chunk_count}"
+            "winning_ticket_ciphertext chunk count does not match public ticket layout"
         )
 
     modulus = int(layout.chunk_modulus)
-    decrypted: list[int] = []
+    recovered_chunks: list[int] = []
 
-    for idx, wire_value in enumerate(winning_ticket_ciphertext):
+    for chunk_index, wire_value in enumerate(winning_ticket_ciphertext):
+        if chunk_index not in decryption_shares_by_chunk:
+            raise ValueError(f"missing decryption shares for winning chunk {chunk_index}")
+
         ciphertext = _ciphertext_from_wire(fhe, wire_value)
-        value = int(fhe.user_decrypt_scalar(ciphertext))
+        share_strings = [
+            share.share
+            for share in decryption_shares_by_chunk[chunk_index]
+        ]
+        recovered_value = int(
+            fhe.decrypt(
+                ciphertext=ciphertext,
+                shares=share_strings,
+            )
+        )
 
-        if value < 0 or value >= modulus:
+        if recovered_value < 0 or recovered_value >= modulus:
             raise ValueError(
-                f"decrypted ticket chunk {idx} out of range for modulus {modulus}: {value}"
+                f"recovered ticket chunk {chunk_index} out of range for modulus {modulus}: "
+                f"{recovered_value}"
             )
 
-        decrypted.append(value)
+        recovered_chunks.append(recovered_value)
 
-    return decrypted
+    return recovered_chunks
 
 
 def recover_ticket_hash_suffix(
@@ -103,7 +150,7 @@ def recover_ticket_hash_suffix(
     layout: TicketCipherLayout,
 ) -> str:
     """
-    Patent Step20: reconstruct the ticket hash suffix from decrypted chunks.
+    Patent Step20: reconstruct the ticket hash suffix from recovered chunks.
     """
     if layout.recovery_format != "hex_concat":
         raise ValueError(f"unsupported ticket recovery format: {layout.recovery_format!r}")
@@ -114,8 +161,7 @@ def recover_ticket_hash_suffix(
 
     if len(decrypted_ticket_chunks) != layout.chunk_count:
         raise ValueError(
-            f"decrypted chunk count mismatch: got {len(decrypted_ticket_chunks)}, "
-            f"expected {layout.chunk_count}"
+            "recovered chunk count does not match public ticket layout"
         )
 
     chunk_max = 1 << int(layout.chunk_bit_width)
@@ -149,26 +195,40 @@ def recover_and_verify_winning_ticket(
     participant_artifacts: Iterable[Phase3ParticipantArtifact],
 ) -> PatentStep20TicketRecoveryResult:
     """
-    Patent Step19/20 end-to-end recovery.
+    Patent Step19-23 helper.
 
-    1. Decrypt selected euint16 winning ticket chunks.
-    2. Reconstruct ticket_hash_suffix.
-    3. Match the suffix against Phase3 ticket artifacts.
-    4. Verify ticket_hash_prefix + suffix and hash(ticket_preimage).
+    Step19: generate partial decrypt shares for Step18-selected ticket chunks.
+    Step20: combine shares and recover ticket hash suffix.
+    Step21: identify winner by suffix match.
+    Step22: reveal the winning ticket preimage.
+    Step23: verify H(preimage) prefix/suffix against the candidate message data.
     """
     artifacts = _iter_phase3_artifacts(participant_artifacts)
     layout = artifacts[0].ticket_artifact.ticket_cipher_layout
 
     for artifact in artifacts:
-        other_layout = artifact.ticket_artifact.ticket_cipher_layout
-        if other_layout != layout:
-            raise ValueError("all participant ticket layouts must match")
+        if artifact.ticket_artifact.ticket_cipher_layout != layout:
+            raise ValueError("participant ticket layouts must match")
 
-    decrypted_chunks = decrypt_winning_ticket_chunks(
+    participant_ids = [
+        artifact.participant.participant_id
+        for artifact in artifacts
+    ]
+
+    decryption_shares_by_chunk = step19_generate_winning_ticket_decryption_shares(
         fhe,
-        phase4_result.winning_ticket_ciphertext,
-        layout,
+        participant_ids=participant_ids,
+        winning_ticket_ciphertext=phase4_result.winning_ticket_ciphertext,
+        layout=layout,
     )
+
+    decrypted_chunks = step20_recover_winning_ticket_chunks(
+        fhe,
+        winning_ticket_ciphertext=phase4_result.winning_ticket_ciphertext,
+        decryption_shares_by_chunk=decryption_shares_by_chunk,
+        layout=layout,
+    )
+
     recovered_suffix = recover_ticket_hash_suffix(decrypted_chunks, layout)
 
     matches = [
@@ -178,9 +238,7 @@ def recover_and_verify_winning_ticket(
     ]
 
     if len(matches) != 1:
-        raise ValueError(
-            f"expected exactly one matching ticket suffix, got {len(matches)}"
-        )
+        raise ValueError(f"winner suffix match count must be one, got {len(matches)}")
 
     winner_artifact = matches[0]
     ticket = winner_artifact.ticket_artifact
@@ -203,6 +261,7 @@ def recover_and_verify_winning_ticket(
 
     return PatentStep20TicketRecoveryResult(
         winner_participant_id=winner_artifact.participant.participant_id,
+        decryption_shares_by_chunk=decryption_shares_by_chunk,
         decrypted_ticket_chunks=decrypted_chunks,
         ticket_hash_suffix=recovered_suffix,
         ticket_hash=reconstructed_hash,

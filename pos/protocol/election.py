@@ -99,56 +99,6 @@ def _kms_ticket_vector_ok(message: CandidateMessage) -> bool:
     )
 
 
-def _record_other_proof_checks_ok(record: ProofVerificationRecord) -> bool:
-    return (
-        record.polynomial_ok
-        and record.share_commitment_ok
-        and record.share_public_key_ok
-        and record.declared_public_key_vector_ok
-        and record.relation_ok
-        and record.noise_ok
-        and record.recovery_ok
-        and record.commitment_equation_ok
-        and record.discrete_log_key_ok
-        and record.secret_recover_ok
-        and record.public_binding_ok
-    )
-
-
-def _adapt_kms_external_ciphertext_equation(
-    record: ProofVerificationRecord,
-    *,
-    external_ciphertext_binding_ok: bool,
-) -> ProofVerificationRecord:
-    """
-    Strict patent KMS mode uses opaque TFHE ciphertext handles.
-
-    The legacy proof system's ciphertext equation was written for the old local
-    mock ciphertext payload, where encoded_value could be recomputed directly.
-    For native KMS TFHE ciphertexts, the verifier must not decrypt stake/PRF/ticket
-    ciphertexts during step11. Therefore, in strict KMS mode, the old encoded-value
-    equation is replaced by:
-      1. all cut-and-choose / Shamir / commitment / key / noise checks pass;
-      2. public binding passes;
-      3. the public ciphertext handle is a KMS threshold ciphertext with the
-         required patent data type.
-
-    This keeps step11 as a real proof gate and prevents the legacy mock equation
-    from incorrectly rejecting opaque TFHE ciphertexts.
-    """
-    if not (_strict_patent_mode_enabled() and _strict_patent_backend_selected()):
-        return record
-
-    if record.ciphertext_equation_ok:
-        return record
-
-    if external_ciphertext_binding_ok and _record_other_proof_checks_ok(record):
-        return replace(record, ciphertext_equation_ok=True)
-
-    return record
-
-
-
 def _ciphertext_to_phase4_wire(value: object) -> str:
     """
     Convert patent KMS ciphertext handles into the Phase4Result wire format.
@@ -285,13 +235,6 @@ def step11_verify_proofs(
             expected_ciphertext=message.encrypted_prf_share,
             expected_public_key_vector=message.prf_share_public_keys,
         )
-        prf_record = _adapt_kms_external_ciphertext_equation(
-            prf_record,
-            external_ciphertext_binding_ok=_kms_ciphertext_payload_ok(
-                message.encrypted_prf_share,
-                "euint32",
-            ),
-        )
         participant_records.append(prf_record)
 
         stake_cipher_record = proof_system.verify_ciphertext_encryption_proof(
@@ -300,15 +243,8 @@ def step11_verify_proofs(
             expected_ciphertexts=[message.encrypted_stake],
             expected_extra_public_data={
                 "proof_label": "stake_ciphertext",
-                "plaintext_label": "stake",
+                "witness_label": "stake",
             },
-        )
-        stake_cipher_record = _adapt_kms_external_ciphertext_equation(
-            stake_cipher_record,
-            external_ciphertext_binding_ok=_kms_ciphertext_payload_ok(
-                message.encrypted_stake,
-                "euint32",
-            ),
         )
         participant_records.append(stake_cipher_record)
 
@@ -318,13 +254,6 @@ def step11_verify_proofs(
             expected_ciphertext=message.encrypted_stake,
             expected_commitment=message.stake_commitment.stake_commitment,
         )
-        commitment_record = _adapt_kms_external_ciphertext_equation(
-            commitment_record,
-            external_ciphertext_binding_ok=_kms_ciphertext_payload_ok(
-                message.encrypted_stake,
-                "euint32",
-            ),
-        )
         participant_records.append(commitment_record)
 
         ticket_record = proof_system.verify_ciphertext_encryption_proof(
@@ -332,10 +261,6 @@ def step11_verify_proofs(
             revealed[participant_id]["ticket_ciphertext_correctness"],
             expected_ciphertexts=message.encrypted_ticket,
             expected_extra_public_data=_ticket_expected_public_binding(message),
-        )
-        ticket_record = _adapt_kms_external_ciphertext_equation(
-            ticket_record,
-            external_ciphertext_binding_ok=_kms_ticket_vector_ok(message),
         )
         participant_records.append(ticket_record)
 

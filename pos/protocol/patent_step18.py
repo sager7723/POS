@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Sequence
 
-from pos.crypto.patent_widths import lottery_modulus
-
 
 @dataclass(frozen=True)
 class PatentStep18WinnerSelectionResult:
@@ -13,12 +11,6 @@ class PatentStep18WinnerSelectionResult:
     compare_bits: list[Any]
     winner_onehot_flags: list[Any]
     winning_ticket_ciphertext: list[Any]
-
-    # 测试/验收辅助字段；生产路径最终会在 Stage-10 清理 metadata 依赖。
-    expected_cumulative_stakes: list[int] | None = None
-    expected_compare_bits: list[int] | None = None
-    expected_winner_index: int | None = None
-    expected_winning_ticket_chunks: list[int] | None = None
 
 
 def _validate_rectangular_ticket_chunks(
@@ -45,29 +37,17 @@ def _select_one_chunk_by_onehot(
     fhe: Any,
     onehot_flags: Sequence[Any],
     chunk_ciphertexts: Sequence[Any],
-    *,
-    expected_winner_index: int,
-    expected_chunk_values: Sequence[int] | None,
 ) -> Any:
     if len(onehot_flags) != len(chunk_ciphertexts):
         raise ValueError("onehot_flags length must match chunk_ciphertexts length")
 
     selected = chunk_ciphertexts[0]
 
-    if expected_chunk_values is None:
-        selected_expected = 0
-    else:
-        selected_expected = int(expected_chunk_values[0])
-
     for idx in range(1, len(chunk_ciphertexts)):
-        if expected_chunk_values is not None and idx == expected_winner_index:
-            selected_expected = int(expected_chunk_values[idx])
-
         selected = fhe.eval_select(
             onehot_flags[idx],
             chunk_ciphertexts[idx],
             selected,
-            expected_result=selected_expected,
         )
 
     return selected
@@ -79,14 +59,9 @@ def step18_patent_select_winner_ticket(
     encrypted_stakes: Sequence[Any],
     scaled_random_ciphertext: Any,
     encrypted_ticket_chunks_by_participant: Sequence[Sequence[Any]],
-    *,
-    expected_stakes_for_test: Sequence[int] | None = None,
-    expected_scaled_random_for_test: int | None = None,
-    expected_ticket_chunks_for_test: Sequence[Sequence[int]] | None = None,
-    expected_winner_index_for_test: int | None = None,
 ) -> PatentStep18WinnerSelectionResult:
     """
-    Patent step-18 implementation over KMS threshold + TFHE ciphertexts.
+    Patent Step18 over KMS/TFHE ciphertexts only.
 
     Computes:
       1. encrypted cumulative stakes
@@ -94,9 +69,10 @@ def step18_patent_select_winner_ticket(
       3. Clocate(first true compare bit)
       4. Cselect over encrypted ticket chunks
 
-    No plaintext fallback is used for the encrypted computation. The expected_*
-    arguments are only used to populate current KMS decrypt-validation metadata
-    during Stage-9 tests.
+    Strict rule:
+      - only ciphertext inputs are accepted
+      - no plaintext winner index is computed or returned
+      - encrypted compare, locate, and select are performed by the FHE backend
     """
 
     participant_ids = list(participant_ids)
@@ -124,104 +100,35 @@ def step18_patent_select_winner_ticket(
         encrypted_ticket_chunks_by_participant
     )
 
-    expected_stakes: list[int] | None = None
-    expected_cumulative: list[int] | None = None
-    expected_compare_bits: list[int] | None = None
-    expected_ticket_chunks: list[list[int]] | None = None
-    expected_winning_ticket_chunks: list[int] | None = None
-
-    if expected_stakes_for_test is not None:
-        expected_stakes = [int(value) for value in expected_stakes_for_test]
-        if len(expected_stakes) != len(participant_ids):
-            raise ValueError("expected_stakes_for_test length mismatch")
-
-        expected_cumulative = []
-        running = 0
-        modulus = lottery_modulus()
-        for stake in expected_stakes:
-            running = (running + stake) % modulus
-            expected_cumulative.append(running)
-
-    if expected_scaled_random_for_test is not None and expected_cumulative is not None:
-        expected_compare_bits = [
-            1 if int(expected_scaled_random_for_test) < cumulative else 0
-            for cumulative in expected_cumulative
-        ]
-
-    if expected_winner_index_for_test is None:
-        if expected_compare_bits is None:
-            expected_winner_index = 0
-        else:
-            try:
-                expected_winner_index = expected_compare_bits.index(1)
-            except ValueError as exc:
-                raise ValueError(
-                    "expected compare bits contain no winning true bit; "
-                    "scaled random must be below total stake"
-                ) from exc
-    else:
-        expected_winner_index = int(expected_winner_index_for_test)
-
-    if expected_winner_index < 0 or expected_winner_index >= len(participant_ids):
-        raise ValueError(f"expected_winner_index out of range: {expected_winner_index}")
-
-    if expected_ticket_chunks_for_test is not None:
-        expected_ticket_chunks = [
-            [int(chunk) for chunk in chunks]
-            for chunks in expected_ticket_chunks_for_test
-        ]
-
-        if len(expected_ticket_chunks) != len(participant_ids):
-            raise ValueError("expected_ticket_chunks_for_test participant length mismatch")
-
-        for idx, chunks in enumerate(expected_ticket_chunks):
-            if len(chunks) != ticket_chunk_count:
-                raise ValueError(
-                    f"expected_ticket_chunks_for_test[{idx}] chunk count mismatch"
-                )
-
-        expected_winning_ticket_chunks = list(expected_ticket_chunks[expected_winner_index])
-
-    # 1. 累加质押密文：cum_i = stake_0 + ... + stake_i
+    # 1. Cumulative encrypted stake:
+    #    cum_i = stake_0 + ... + stake_i
     cumulative_stake_ciphertexts: list[Any] = [encrypted_stakes[0]]
     running_ciphertext = encrypted_stakes[0]
 
     for idx in range(1, len(encrypted_stakes)):
-        if expected_cumulative is None:
-            expected_sum = 0
-        else:
-            expected_sum = expected_cumulative[idx]
-
         running_ciphertext = fhe.eval_add(
             running_ciphertext,
             encrypted_stakes[idx],
-            expected_result=expected_sum,
         )
         cumulative_stake_ciphertexts.append(running_ciphertext)
 
-    # 2. Ccompare：scaled_random < cumulative_stake_i
+    # 2. Ccompare:
+    #    compare_i = scaled_random < cumulative_stake_i
     compare_bits: list[Any] = []
-    for idx, cumulative_ciphertext in enumerate(cumulative_stake_ciphertexts):
-        if expected_compare_bits is None:
-            expected_compare = False
-        else:
-            expected_compare = bool(expected_compare_bits[idx])
-
+    for cumulative_ciphertext in cumulative_stake_ciphertexts:
         compare_bits.append(
             fhe.eval_compare(
                 scaled_random_ciphertext,
                 cumulative_ciphertext,
-                expected_result=expected_compare,
             )
         )
 
-    # 3. Clocate：定位第一个 true，得到 one-hot winner flags
-    winner_onehot_flags = fhe.eval_locate_first_true(
-        compare_bits,
-        expected_index=expected_winner_index,
-    )
+    # 3. Clocate:
+    #    encrypted one-hot flags for first true compare bit.
+    winner_onehot_flags = fhe.eval_locate_first_true(compare_bits)
 
-    # 4. Cselect：对每个 ticket chunk 做 one-hot 选择
+    # 4. Cselect:
+    #    select each encrypted ticket chunk by encrypted one-hot flags.
     winning_ticket_ciphertext: list[Any] = []
     for chunk_index in range(ticket_chunk_count):
         chunk_ciphertexts = [
@@ -229,20 +136,10 @@ def step18_patent_select_winner_ticket(
             for participant_index in range(len(participant_ids))
         ]
 
-        if expected_ticket_chunks is None:
-            expected_chunk_values = None
-        else:
-            expected_chunk_values = [
-                expected_ticket_chunks[participant_index][chunk_index]
-                for participant_index in range(len(participant_ids))
-            ]
-
         winning_chunk = _select_one_chunk_by_onehot(
             fhe,
             winner_onehot_flags,
             chunk_ciphertexts,
-            expected_winner_index=expected_winner_index,
-            expected_chunk_values=expected_chunk_values,
         )
         winning_ticket_ciphertext.append(winning_chunk)
 
@@ -252,10 +149,6 @@ def step18_patent_select_winner_ticket(
         compare_bits=compare_bits,
         winner_onehot_flags=list(winner_onehot_flags),
         winning_ticket_ciphertext=winning_ticket_ciphertext,
-        expected_cumulative_stakes=expected_cumulative,
-        expected_compare_bits=expected_compare_bits,
-        expected_winner_index=expected_winner_index,
-        expected_winning_ticket_chunks=expected_winning_ticket_chunks,
     )
 
 
@@ -310,27 +203,21 @@ def step18_patent_select_winner_ticket_from_candidate_messages(
     fhe: Any,
     candidate_messages: dict[str, Any],
     scaled_random_ciphertext: Any,
-    *,
-    expected_stakes_for_test: Sequence[int] | None = None,
-    expected_scaled_random_for_test: int | None = None,
-    expected_ticket_chunks_for_test: Sequence[Sequence[int]] | None = None,
-    expected_winner_index_for_test: int | None = None,
 ) -> PatentStep18WinnerSelectionResult:
     """
-    Candidate-message adapter for patent step 18.
+    Candidate-message adapter for patent Step18.
 
     Reads:
       - message.encrypted_stake
       - message.encrypted_ticket
 
     Computes:
-      encrypted cumulative stakes
-      Ccompare(scaled_random, cumulative_stakes)
-      Clocate(first true)
-      Cselect(encrypted_ticket_chunks)
+      - encrypted cumulative stakes
+      - Ccompare(scaled_random, cumulative_stakes)
+      - Clocate(first true)
+      - Cselect(encrypted_ticket_chunks)
 
-    This is the function that Stage-9.5 will call from the strict
-    POS_STRICT_PATENT_MODE=1 phase-4 path.
+    This adapter does not compute or return a plaintext winner index.
     """
     if not candidate_messages:
         raise ValueError("candidate_messages must not be empty")
@@ -368,8 +255,4 @@ def step18_patent_select_winner_ticket_from_candidate_messages(
         encrypted_stakes,
         scaled_random_handle,
         encrypted_ticket_chunks_by_participant,
-        expected_stakes_for_test=expected_stakes_for_test,
-        expected_scaled_random_for_test=expected_scaled_random_for_test,
-        expected_ticket_chunks_for_test=expected_ticket_chunks_for_test,
-        expected_winner_index_for_test=expected_winner_index_for_test,
     )
